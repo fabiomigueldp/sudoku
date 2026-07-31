@@ -460,9 +460,9 @@ export function App() {
     })
   }
 
-  const setDigit = (digit: Digit) => {
+  const setDigit = (digit: Digit, mode?: InputMode) => {
     tactileFeedback(settingsRef.current)
-    dispatch(gameActions.setDigit(digit, Date.now()))
+    dispatch(gameActions.setDigit(digit, Date.now(), mode))
   }
 
   const showOrAdvanceHint = () => {

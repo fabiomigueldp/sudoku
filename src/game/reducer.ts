@@ -281,11 +281,15 @@ function applyCandidate(
     (index) => state.cells[index]?.[mode].includes(digit) ?? false,
   )
   const cells = cloneCells(state.cells)
+  const otherMode = mode === 'corner' ? 'center' : 'corner'
 
   for (const index of indices) {
     const cell = cells[index]
     if (cell === undefined) continue
     cell[mode] = sortedToggle(cell[mode], digit, remove)
+    if (!remove) {
+      cell[otherMode] = cell[otherMode].filter((value) => value !== digit)
+    }
   }
 
   if (sameCells(cells, state.cells)) return state
@@ -640,8 +644,13 @@ export const gameActions = {
     timed({ type: 'input/mode', mode }, at),
   setActiveDigit: (digit: Digit | null, at?: number): GameAction =>
     timed({ type: 'input/active-digit', digit }, at),
-  setDigit: (digit: Digit, at?: number): GameAction =>
-    timed({ type: 'input/digit', digit }, at),
+  setDigit: (digit: Digit, at?: number, mode?: InputMode): GameAction =>
+    timed(
+      mode === undefined
+        ? { type: 'input/digit', digit }
+        : { type: 'input/digit', digit, mode },
+      at,
+    ),
   setColor: (color: CellColor | null, at?: number): GameAction =>
     timed({ type: 'input/color', color }, at),
   erase: (at?: number, scope: EraseScope = 'mode'): GameAction =>

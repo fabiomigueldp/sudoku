@@ -33,7 +33,7 @@ function cellLabel(
   const content = cell.value
     ? `${cell.given ? 'pista' : 'valor'} ${cell.value}`
     : cell.corner.length || cell.center.length
-      ? `vazia, candidatos ${[...cell.corner, ...cell.center].join(', ')}`
+      ? `vazia${cell.corner.length ? `, marcas de canto ${cell.corner.join(', ')}` : ''}${cell.center.length ? `, marcas centrais ${cell.center.join(', ')}` : ''}`
       : 'vazia'
   return `Linha ${row}, coluna ${column}, ${content}${conflict ? ', conflito' : ''}${hinted ? ', destacada pela dica' : ''}`
 }
@@ -89,6 +89,15 @@ const Cell = memo(function Cell({
       data-hint={hinted || undefined}
       data-diagonal={diagonal || undefined}
       data-color={cell.color ?? undefined}
+      data-notes={
+        cell.corner.length > 0 && cell.center.length > 0
+          ? 'mixed'
+          : cell.corner.length > 0
+            ? 'corner'
+            : cell.center.length > 0
+              ? 'center'
+              : undefined
+      }
       aria-label={cellLabel(cell, index, conflict, hinted)}
       aria-selected={selected}
       aria-invalid={conflict || undefined}
@@ -122,7 +131,9 @@ const Cell = memo(function Cell({
           </span>
           {cell.center.length > 0 && (
             <span className="center-notes" aria-hidden="true">
-              {cell.center.join('')}
+              {cell.center.map((digit) => (
+                <span key={digit}>{digit}</span>
+              ))}
             </span>
           )}
         </>

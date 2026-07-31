@@ -95,6 +95,12 @@ export function NumberPad({
           {Array.from({ length: 9 }, (_, index) => {
             const digit = (index + 1) as Digit
             const remaining = 9 - (counts[index] ?? 0)
+            const inputLabel =
+              mode === 'corner'
+                ? `${digit}, marca de canto`
+                : mode === 'center'
+                  ? `${digit}, marca central`
+                  : `${digit}`
             return (
               <button
                 type="button"
@@ -105,8 +111,8 @@ export function NumberPad({
                 onClick={() => onDigit(digit)}
                 aria-label={
                   showRemaining
-                    ? `${digit}, ${remaining === 0 ? 'completo' : `${remaining} restantes`}`
-                    : `${digit}`
+                    ? `${inputLabel}, ${remaining === 0 ? 'completo' : `${remaining} restantes`}`
+                    : inputLabel
                 }
               >
                 <span>{digit}</span>

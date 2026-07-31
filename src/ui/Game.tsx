@@ -32,7 +32,7 @@ interface GameProps {
     extend: boolean,
   ) => void
   onMode: (mode: InputMode) => void
-  onDigit: (digit: Digit) => void
+  onDigit: (digit: Digit, mode?: InputMode) => void
   onColor: (color: CellColor) => void
   onErase: () => void
   onUndo: () => void
@@ -158,7 +158,12 @@ export function Game({
 
     if (/^[1-9]$/.test(event.key)) {
       event.preventDefault()
-      onDigit(Number(event.key) as Digit)
+      const directMode = event.ctrlKey || event.metaKey
+        ? 'center'
+        : event.shiftKey
+          ? 'corner'
+          : undefined
+      onDigit(Number(event.key) as Digit, directMode)
       return
     }
 

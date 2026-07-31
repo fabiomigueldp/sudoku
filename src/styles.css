@@ -1182,14 +1182,36 @@
   }
 
   .center-notes {
-    max-width: 82%;
-    overflow: hidden;
+    position: absolute;
+    inset: 19%;
+    display: flex;
+    align-content: center;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0 0.12em;
     color: var(--ink-soft);
     font-size: clamp(0.46rem, 1.6cqw, 0.76rem);
     font-weight: 640;
     font-variant-numeric: tabular-nums;
-    letter-spacing: 0.03em;
-    white-space: nowrap;
+    line-height: 0.9;
+  }
+
+  .center-notes > span {
+    min-width: 0.55em;
+    text-align: center;
+  }
+
+  .sudoku-cell[data-notes="mixed"] .corner-notes {
+    inset: 5% 7% 43%;
+    font-size: clamp(0.34rem, 1.1cqw, 0.56rem);
+  }
+
+  .sudoku-cell[data-notes="mixed"] .center-notes {
+    inset: 61% 7% 5%;
+    align-content: center;
+    font-size: clamp(0.34rem, 1.1cqw, 0.56rem);
+    line-height: 0.82;
   }
 
   .input-panel {

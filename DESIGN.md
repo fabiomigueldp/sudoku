@@ -192,7 +192,7 @@ Cabeçalhos são baixos, simétricos e previsíveis. Ícones universais podem ap
 
 ### Sudoku Board
 
-A grade é quadrada, sem radius, com limite externo de 2px, divisões de célula de 1px e divisões 3×3 de 2px. Pistas usam tinta e peso 690; entradas usam azul mineral e peso 530. Seleção tem fundo tonal e contorno interno; a dica usa um marcador tracejado mais interno, para ambos permanecerem legíveis quando coexistem. Conflito tem prioridade cromática, mas nunca apaga seleção, dica ou foco. Candidatos mantêm uma matriz 3×3 estável.
+A grade é quadrada, sem radius, com limite externo de 2px, divisões de célula de 1px e divisões 3×3 de 2px. Pistas usam tinta e peso 690; entradas usam azul mineral e peso 530. Seleção tem fundo tonal e contorno interno; a dica usa um marcador tracejado mais interno, para ambos permanecerem legíveis quando coexistem. Conflito tem prioridade cromática, mas nunca apaga seleção, dica ou foco. Candidatos de canto mantêm uma matriz 3×3 estável; marcas centrais fluem em um conjunto compacto sem truncamento. Quando ambos coexistem, a célula separa as duas camadas verticalmente e preserva todos os dígitos.
 
 ### Input Rail
 
