@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title">
+  <title id="title">Grade abstrata do Absolute Sudoku</title>
+  <defs>
+    <clipPath id="board">
+      <rect x="176" y="176" width="672" height="672" rx="56"/>
+    </clipPath>
+  </defs>
+  <rect width="1024" height="1024" rx="224" fill="#202834"/>
+  <g clip-path="url(#board)">
+    <rect x="176" y="176" width="672" height="672" fill="#f3f1eb"/>
+    <rect x="474.667" y="474.667" width="74.666" height="74.666" rx="10" fill="#5ea8cb"/>
+    <path d="M250.667 176v672M325.333 176v672M474.667 176v672M549.333 176v672M698.667 176v672M773.333 176v672M176 250.667h672M176 325.333h672M176 474.667h672M176 549.333h672M176 698.667h672M176 773.333h672" fill="none" stroke="#202834" stroke-opacity=".46" stroke-width="8"/>
+    <path d="M400 176v672M624 176v672M176 400h672M176 624h672" fill="none" stroke="#202834" stroke-width="22"/>
+  </g>
+  <rect x="176" y="176" width="672" height="672" rx="56" fill="none" stroke="#202834" stroke-width="22"/>
+</svg>

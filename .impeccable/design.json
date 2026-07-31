@@ -1,0 +1,373 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-31T01:32:40.2166821-03:00",
+  "title": "Design System: Absolute Sudoku",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Papel Marfim",
+        "canonical": "oklch(96.4% 0.008 87)",
+        "tonalRamp": [
+          "oklch(15% 0.008 87)",
+          "oklch(27% 0.008 87)",
+          "oklch(39% 0.008 87)",
+          "oklch(51% 0.008 87)",
+          "oklch(63% 0.008 87)",
+          "oklch(75% 0.008 87)",
+          "oklch(87% 0.008 87)",
+          "oklch(96.4% 0.008 87)"
+        ]
+      },
+      "paper-raised": {
+        "role": "neutral",
+        "displayName": "Papel Elevado",
+        "canonical": "oklch(98.7% 0.006 87)",
+        "tonalRamp": [
+          "oklch(15% 0.006 87)",
+          "oklch(27% 0.006 87)",
+          "oklch(39% 0.006 87)",
+          "oklch(51% 0.006 87)",
+          "oklch(63% 0.006 87)",
+          "oklch(75% 0.006 87)",
+          "oklch(87% 0.006 87)",
+          "oklch(98.7% 0.006 87)"
+        ]
+      },
+      "paper-sunken": {
+        "role": "neutral",
+        "displayName": "Papel Rebaixado",
+        "canonical": "oklch(92.8% 0.012 87)",
+        "tonalRamp": [
+          "oklch(15% 0.012 87)",
+          "oklch(27% 0.012 87)",
+          "oklch(39% 0.012 87)",
+          "oklch(51% 0.012 87)",
+          "oklch(63% 0.012 87)",
+          "oklch(75% 0.012 87)",
+          "oklch(87% 0.012 87)",
+          "oklch(95% 0.012 87)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta Grafite",
+        "canonical": "oklch(25% 0.025 255)",
+        "tonalRamp": [
+          "oklch(15% 0.025 255)",
+          "oklch(25% 0.025 255)",
+          "oklch(36% 0.025 255)",
+          "oklch(48% 0.024 255)",
+          "oklch(60% 0.021 255)",
+          "oklch(72% 0.018 255)",
+          "oklch(84% 0.014 255)",
+          "oklch(95% 0.008 255)"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Tinta Suave",
+        "canonical": "oklch(48% 0.024 255)",
+        "tonalRamp": [
+          "oklch(15% 0.024 255)",
+          "oklch(27% 0.024 255)",
+          "oklch(39% 0.024 255)",
+          "oklch(48% 0.024 255)",
+          "oklch(60% 0.022 255)",
+          "oklch(72% 0.018 255)",
+          "oklch(84% 0.014 255)",
+          "oklch(95% 0.008 255)"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Tinta Secundária AA",
+        "canonical": "oklch(53% 0.018 255)",
+        "tonalRamp": [
+          "oklch(15% 0.018 255)",
+          "oklch(27% 0.018 255)",
+          "oklch(39% 0.018 255)",
+          "oklch(53% 0.018 255)",
+          "oklch(63% 0.016 255)",
+          "oklch(75% 0.014 255)",
+          "oklch(87% 0.011 255)",
+          "oklch(95% 0.008 255)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Separador Suave",
+        "canonical": "oklch(81% 0.012 255)",
+        "tonalRamp": [
+          "oklch(15% 0.012 255)",
+          "oklch(27% 0.012 255)",
+          "oklch(39% 0.012 255)",
+          "oklch(51% 0.012 255)",
+          "oklch(63% 0.012 255)",
+          "oklch(75% 0.012 255)",
+          "oklch(87% 0.012 255)",
+          "oklch(95% 0.01 255)"
+        ]
+      },
+      "grid-line": {
+        "role": "neutral",
+        "displayName": "Linha de Grade AA",
+        "canonical": "oklch(64% 0.015 255)",
+        "tonalRamp": [
+          "oklch(15% 0.015 255)",
+          "oklch(27% 0.015 255)",
+          "oklch(39% 0.015 255)",
+          "oklch(51% 0.015 255)",
+          "oklch(64% 0.015 255)",
+          "oklch(75% 0.014 255)",
+          "oklch(87% 0.011 255)",
+          "oklch(95% 0.008 255)"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Estrutura Forte",
+        "canonical": "oklch(39% 0.028 255)",
+        "tonalRamp": [
+          "oklch(15% 0.028 255)",
+          "oklch(27% 0.028 255)",
+          "oklch(39% 0.028 255)",
+          "oklch(51% 0.025 255)",
+          "oklch(63% 0.021 255)",
+          "oklch(75% 0.017 255)",
+          "oklch(87% 0.012 255)",
+          "oklch(95% 0.008 255)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Azul Mineral",
+        "canonical": "oklch(47% 0.095 245)",
+        "tonalRamp": [
+          "oklch(15% 0.035 245)",
+          "oklch(27% 0.065 245)",
+          "oklch(39% 0.105 245)",
+          "oklch(47% 0.095 245)",
+          "oklch(60% 0.085 245)",
+          "oklch(72% 0.07 245)",
+          "oklch(84% 0.05 245)",
+          "oklch(94.5% 0.018 245)"
+        ]
+      },
+      "accent-strong": {
+        "role": "primary",
+        "displayName": "Azul Mineral Profundo",
+        "canonical": "oklch(39% 0.105 245)",
+        "tonalRamp": [
+          "oklch(15% 0.04 245)",
+          "oklch(27% 0.075 245)",
+          "oklch(39% 0.105 245)",
+          "oklch(51% 0.098 245)",
+          "oklch(63% 0.085 245)",
+          "oklch(75% 0.066 245)",
+          "oklch(87% 0.043 245)",
+          "oklch(95% 0.018 245)"
+        ]
+      },
+      "accent-soft": {
+        "role": "primary",
+        "displayName": "Azul Mineral Tonal",
+        "canonical": "oklch(90% 0.035 245)",
+        "tonalRamp": [
+          "oklch(15% 0.035 245)",
+          "oklch(27% 0.035 245)",
+          "oklch(39% 0.035 245)",
+          "oklch(51% 0.035 245)",
+          "oklch(63% 0.035 245)",
+          "oklch(75% 0.035 245)",
+          "oklch(90% 0.035 245)",
+          "oklch(95% 0.02 245)"
+        ]
+      },
+      "danger": {
+        "role": "error",
+        "displayName": "Carmim Lógico",
+        "canonical": "oklch(52% 0.13 27)",
+        "tonalRamp": [
+          "oklch(15% 0.04 27)",
+          "oklch(27% 0.08 27)",
+          "oklch(39% 0.11 27)",
+          "oklch(52% 0.13 27)",
+          "oklch(64% 0.1 27)",
+          "oklch(76% 0.07 27)",
+          "oklch(88% 0.04 27)",
+          "oklch(95% 0.015 27)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Tese",
+        "purpose": "Somente a proposição da tela inicial."
+      },
+      "title": {
+        "displayName": "Título",
+        "purpose": "Títulos de página e estados conclusivos."
+      },
+      "body": {
+        "displayName": "Corpo",
+        "purpose": "Explicação concisa e leitura contínua."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Contexto, categoria e metadado compacto."
+      }
+    },
+    "shadows": [
+      {
+        "name": "response-low",
+        "value": "0 1px 3px oklch(20% 0.02 255 / 0.09)",
+        "purpose": "Segmento ativo sobre trilho."
+      },
+      {
+        "name": "context-sheet",
+        "value": "0 10px 34px oklch(18% 0.02 255 / 0.18)",
+        "purpose": "Dica móvel ou folha temporária."
+      },
+      {
+        "name": "modal-plane",
+        "value": "0 20px 70px oklch(12% 0.02 255 / 0.24)",
+        "purpose": "Opções contextuais sobre a partida."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "120ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Resposta imediata de botão, célula e modo."
+      },
+      {
+        "name": "state-standard",
+        "value": "180ms cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Transições de estado maiores."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "440px"
+      },
+      {
+        "name": "single-column",
+        "value": "800px"
+      },
+      {
+        "name": "low-landscape",
+        "value": "620px height"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "A única ação de alta ênfase em uma superfície.",
+      "html": "<button class=\"ds-btn-primary\">Começar</button>",
+      "css": ".ds-btn-primary { min-height: 48px; padding: 0 18px; border: 0; border-radius: 8px; background: var(--accent, oklch(47% 0.095 245)); color: var(--paper-raised, oklch(98.7% 0.006 87)); font: 650 16px system-ui; transition: background-color 120ms cubic-bezier(0.22,1,0.36,1), transform 120ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-primary:hover { background: var(--accent-strong, oklch(39% 0.105 245)); } .ds-btn-primary:active { transform: scale(.985); } .ds-btn-primary:focus-visible { outline: 3px solid var(--focus, oklch(58% 0.14 245)); outline-offset: 3px; }"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "icon-button",
+      "description": "Ação universal com alvo confortável e nome acessível.",
+      "html": "<button class=\"ds-icon-btn\" aria-label=\"Voltar\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m15 18-6-6 6-6\"/></svg></button>",
+      "css": ".ds-icon-btn { display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--ink-soft, oklch(48% 0.024 255)); } .ds-icon-btn svg { width: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; } .ds-icon-btn:hover { background: var(--paper-sunken, oklch(92.8% 0.012 87)); color: var(--ink, oklch(25% 0.025 255)); } .ds-icon-btn:focus-visible { outline: 3px solid var(--focus, oklch(58% 0.14 245)); outline-offset: 3px; }"
+    },
+    {
+      "name": "Sudoku Cell",
+      "kind": "custom",
+      "refersTo": "sudoku-cell",
+      "description": "Célula plana com pista estável e seleção interna.",
+      "html": "<button class=\"ds-cell\" aria-label=\"Linha 1, coluna 1, pista 4\"><strong>4</strong></button>",
+      "css": ".ds-cell { position: relative; display: grid; width: 56px; height: 56px; place-items: center; border: 1px solid var(--line, oklch(81% 0.012 255)); border-radius: 0; background: var(--paper-raised, oklch(98.7% 0.006 87)); color: var(--ink, oklch(25% 0.025 255)); font: 690 28px system-ui; } .ds-cell:hover { background: color-mix(in oklch, var(--accent-soft, oklch(90% 0.035 245)) 35%, var(--paper-raised, oklch(98.7% 0.006 87))); } .ds-cell:focus-visible { outline: 3px solid var(--focus, oklch(58% 0.14 245)); outline-offset: -3px; }"
+    },
+    {
+      "name": "Selected Sudoku Cell",
+      "kind": "custom",
+      "refersTo": "sudoku-cell-selected",
+      "description": "Seleção inequívoca por tom e contorno, sem depender somente de cor.",
+      "html": "<button class=\"ds-cell-selected\" aria-selected=\"true\">6</button>",
+      "css": ".ds-cell-selected { position: relative; display: grid; width: 56px; height: 56px; place-items: center; border: 1px solid var(--line, oklch(81% 0.012 255)); border-radius: 0; background: var(--accent-soft, oklch(90% 0.035 245)); color: var(--accent-strong, oklch(39% 0.105 245)); font: 530 28px system-ui; } .ds-cell-selected::after { position: absolute; inset: 3px; border: 2px solid var(--accent, oklch(47% 0.095 245)); content: \"\"; } .ds-cell-selected:focus-visible { outline: 3px solid var(--focus, oklch(58% 0.14 245)); outline-offset: -3px; }"
+    },
+    {
+      "name": "Input Mode",
+      "kind": "nav",
+      "description": "Modo mutuamente exclusivo com estado ativo tonal.",
+      "html": "<div class=\"ds-mode\"><button aria-pressed=\"true\">Número</button><button>Canto</button><button>Centro</button><button>Cor</button></div>",
+      "css": ".ds-mode { display: grid; grid-template-columns: repeat(4,1fr); gap: 2px; padding: 3px; border: 1px solid var(--line, oklch(81% 0.012 255)); border-radius: 8px; background: var(--paper-sunken, oklch(92.8% 0.012 87)); } .ds-mode button { min-height: 38px; border: 0; border-radius: 5px; background: transparent; color: var(--ink-soft, oklch(48% 0.024 255)); font: 600 12px system-ui; } .ds-mode button[aria-pressed=\"true\"] { background: var(--paper-raised, oklch(98.7% 0.006 87)); color: var(--ink, oklch(25% 0.025 255)); } .ds-mode button:focus-visible { outline: 3px solid var(--focus, oklch(58% 0.14 245)); outline-offset: 2px; }"
+    },
+    {
+      "name": "Setting Switch",
+      "kind": "input",
+      "description": "Preferência binária familiar, legível e tocável.",
+      "html": "<label class=\"ds-setting\"><span>Alto contraste</span><input type=\"checkbox\"><i aria-hidden=\"true\"></i></label>",
+      "css": ".ds-setting { display: flex; min-height: 70px; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid var(--line, oklch(81% 0.012 255)); font: 620 14px system-ui; } .ds-setting input { position: absolute; opacity: 0; } .ds-setting i { position: relative; width: 42px; height: 25px; border: 1px solid var(--line, oklch(81% 0.012 255)); border-radius: 999px; background: var(--paper-sunken, oklch(92.8% 0.012 87)); } .ds-setting i::after { position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: var(--ink-soft, oklch(48% 0.024 255)); content: \"\"; transition: transform 180ms cubic-bezier(0.22,1,0.36,1); } .ds-setting input:checked + i { background: var(--accent, oklch(47% 0.095 245)); } .ds-setting input:checked + i::after { background: var(--paper-raised, oklch(98.7% 0.006 87)); transform: translateX(17px); } .ds-setting input:focus-visible + i { outline: 3px solid var(--focus, oklch(58% 0.14 245)); outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Papel de Precisão",
+    "overview": "A interface deve parecer um instrumento de raciocínio sobre uma folha excepcionalmente bem calibrada. As superfícies são calmas, os limites são exatos e a tipografia nativa desaparece durante o uso. O tabuleiro sempre domina a composição; controles existem na periferia visual e se tornam claros no instante em que são necessários. O sistema rejeita o visual de jogo mobile sustentado por retenção, o dashboard SaaS e a decoração que pede atenção.",
+    "keyCharacteristics": [
+      "Tabuleiro espacialmente estável em qualquer proporção.",
+      "Neutros levemente aquecidos e um único acento funcional.",
+      "Hierarquia por escala, peso e distância, nunca por containers repetidos.",
+      "Movimento curto, reversível e restrito a mudanças de estado.",
+      "Alvos de 44–48px fora da grade e foco sempre inequívoco."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "O azul mineral ocupa menos de 10% da tela e nunca é decoração.",
+        "section": "colors"
+      },
+      {
+        "name": "The Paper Is Never White Rule",
+        "body": "Nenhuma superfície usa branco ou preto puros; todo neutral carrega a temperatura do sistema.",
+        "section": "colors"
+      },
+      {
+        "name": "The Color Is Not Meaning Rule",
+        "body": "Conflito, seleção, foco e dica sempre possuem forma, contorno, peso ou texto além da cor.",
+        "section": "colors"
+      },
+      {
+        "name": "The Native Instrument Rule",
+        "body": "Display fonts são proibidas em tabuleiro, botão, ajuste, número e label.",
+        "section": "typography"
+      },
+      {
+        "name": "The Number Stability Rule",
+        "body": "Cronômetro, estatísticas, candidatos e teclado usam numerais tabulares.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Se uma superfície está em repouso e pode ser separada por espaço ou linha, sombra é proibida.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preservar o tabuleiro como maior objeto funcional da tela.",
+      "Do manter ações essenciais entre 44px e 48px e células acima de 24px.",
+      "Do usar transições de 120–180ms somente em opacity, transform e cor.",
+      "Do compor por espaço, linhas e alinhamento antes de criar uma superfície.",
+      "Do manter zoom da página, texto a 200%, safe areas e redução de movimento.",
+      "Do revelar candidatos, cores, análise e variantes progressivamente."
+    ],
+    "donts": [
+      "Don't usar badges, moedas, troféus, streak pressure, pop-ups promocionais ou toasts rotineiros.",
+      "Don't usar emojis decorativos, ícones sem função, glassmorphism ou gradientes chamativos.",
+      "Don't transformar cada seção em card ou criar grids de cards idênticos.",
+      "Don't usar borda lateral maior que 1px como faixa de destaque.",
+      "Don't usar gradient text, branco puro, preto puro ou acento saturado em estado inativo.",
+      "Don't impor limite de erros, game over ou animação que interrompa o raciocínio.",
+      "Don't esconder uma ação essencial apenas em long press, swipe, double tap ou drag."
+    ]
+  }
+}
