@@ -28,8 +28,8 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         orientation: 'any',
-        background_color: '#f3f1eb',
-        theme_color: '#f3f1eb',
+        background_color: '#f6f3ed',
+        theme_color: '#f6f3ed',
         categories: ['games', 'entertainment'],
         prefer_related_applications: false,
         icons: [

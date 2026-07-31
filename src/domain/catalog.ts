@@ -67,7 +67,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   showTimer: true,
   reduceMotion: false,
   highContrast: false,
-  sound: false,
+  sound: true,
   haptics: true,
 }
 

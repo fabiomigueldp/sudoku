@@ -206,7 +206,7 @@ Modo, números e ações formam uma única sequência vertical no desktop e comp
 - **Do** manter ações essenciais entre 44px e 48px e células acima de 24px.
 - **Do** usar transições de 120–180ms somente em opacity, transform e cor.
 - **Do** compor por espaço, linhas e alinhamento antes de criar uma superfície.
-- **Do** manter zoom da página, texto a 200%, safe areas e redução de movimento.
+- **Do** manter a viewport espacialmente estável, safe areas e redução de movimento.
 - **Do** revelar candidatos, cores, análise e variantes progressivamente.
 
 ### Don't:

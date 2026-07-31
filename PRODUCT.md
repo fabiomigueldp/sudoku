@@ -37,4 +37,4 @@ Também não deve copiar a densidade intimidante de ferramentas avançadas que e
 
 WCAG 2.2 AA é o mínimo obrigatório, em conjunto com os princípios do Apple Human Interface Guidelines e padrões equivalentes de Android e WAI-ARIA. O tabuleiro deve ser operável por teclado, touch, mouse, stylus, VoiceOver, TalkBack, NVDA e tecnologias de controle alternativo.
 
-O produto preserva zoom da página e texto a 200%, oferece foco visível, alvos confortáveis, contraste robusto, diferenciação que não depende somente de cor, descrições completas das células, alto contraste, temas claro e escuro, redução de movimento e feedback sonoro ou háptico sempre opcional. Gestos avançados nunca são a única forma de executar uma ação.
+O produto mantém uma viewport estável, sem zoom involuntário que desloque o tabuleiro, e oferece foco visível, alvos confortáveis, contraste robusto, diferenciação que não depende somente de cor, descrições completas das células, alto contraste, temas claro e escuro, redução de movimento e feedback sonoro ou háptico sempre opcional. Gestos avançados nunca são a única forma de executar uma ação.

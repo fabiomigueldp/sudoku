@@ -4,16 +4,49 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta
       name="description"
       content="Absolute Sudoku: um instrumento preciso, completo e offline para jogar Sudoku por toda a vida."
     />
-    <meta name="theme-color" content="#f3f1eb" />
     <meta name="color-scheme" content="light dark" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      (() => {
+        let preference = 'system'
+        try {
+          const saved = JSON.parse(
+            localStorage.getItem('absolute-sudoku:settings:v2') || '{}',
+          )
+          if (['light', 'dark', 'system'].includes(saved.theme)) {
+            preference = saved.theme
+          }
+        } catch {}
+
+        const dark =
+          preference === 'dark' ||
+          (preference === 'system' &&
+            matchMedia('(prefers-color-scheme: dark)').matches)
+        const color = dark ? '#0e1319' : '#f6f3ed'
+
+        if (preference !== 'system') {
+          document.documentElement.dataset.theme = preference
+        }
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        document.documentElement.style.backgroundColor = color
+
+        const themeColor = document.createElement('meta')
+        themeColor.name = 'theme-color'
+        themeColor.content = color
+        document.head.append(themeColor)
+
+        const statusBar = document.createElement('meta')
+        statusBar.name = 'apple-mobile-web-app-status-bar-style'
+        statusBar.content = dark ? 'black-translucent' : 'default'
+        document.head.append(statusBar)
+      })()
+    </script>
     <meta name="apple-mobile-web-app-title" content="Sudoku" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />

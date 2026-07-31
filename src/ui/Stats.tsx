@@ -25,6 +25,12 @@ export function Stats({ stats, onBack }: StatsProps) {
     stats.completed > 0
       ? Math.round((stats.cleanSolves / stats.completed) * 100)
       : 0
+  const totalMistakes = stats.records.reduce(
+    (total, record) => total + record.mistakes,
+    0,
+  )
+  const averageMistakes =
+    stats.completed > 0 ? totalMistakes / stats.completed : 0
 
   return (
     <main className="page-screen stats-screen">
@@ -72,6 +78,18 @@ export function Stats({ stats, onBack }: StatsProps) {
               <span>Tempo de jogo</span>
               <strong>{formatTime(stats.totalTimeMs)}</strong>
             </div>
+            <div>
+              <span>Erros</span>
+              <strong>{totalMistakes}</strong>
+            </div>
+            <div>
+              <span>Média de erros</span>
+              <strong>
+                {new Intl.NumberFormat('pt-BR', {
+                  maximumFractionDigits: 1,
+                }).format(averageMistakes)}
+              </strong>
+            </div>
           </section>
 
           <section className="history-section">
@@ -102,9 +120,13 @@ export function Stats({ stats, onBack }: StatsProps) {
                   <span>
                     <strong>{formatTime(record.elapsedMs)}</strong>
                     <small>
-                      {record.hintsUsed
-                        ? `${record.hintsUsed} ${record.hintsUsed === 1 ? 'dica' : 'dicas'}`
-                        : 'limpo'}
+                      {record.mistakes === 0
+                        ? 'sem erros'
+                        : `${record.mistakes} ${record.mistakes === 1 ? 'erro' : 'erros'}`}
+                      {' · '}
+                      {record.hintsUsed === 0
+                        ? 'sem dicas'
+                        : `${record.hintsUsed} ${record.hintsUsed === 1 ? 'dica' : 'dicas'}`}
                     </small>
                   </span>
                 </article>

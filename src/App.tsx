@@ -45,6 +45,8 @@ type Screen = 'home' | 'library' | 'game' | 'settings' | 'stats'
 type UpdateApp = (reloadPage?: boolean) => Promise<void>
 
 let audioContext: AudioContext | null = null
+const LIGHT_CHROME_COLOR = '#f6f3ed'
+const DARK_CHROME_COLOR = '#0e1319'
 
 function subtleSound(enabled: boolean) {
   if (!enabled || typeof AudioContext === 'undefined') return
@@ -280,11 +282,32 @@ export function App() {
 
   useEffect(() => {
     const root = document.documentElement
-    if (settings.theme === 'system') delete root.dataset.theme
-    else root.dataset.theme = settings.theme
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+    const applyTheme = () => {
+      if (settings.theme === 'system') delete root.dataset.theme
+      else root.dataset.theme = settings.theme
 
-    if (!hydratedRef.current) return
-    void saveSettings(settings)
+      const dark =
+        settings.theme === 'dark' ||
+        (settings.theme === 'system' && systemTheme.matches)
+      const chromeColor = dark ? DARK_CHROME_COLOR : LIGHT_CHROME_COLOR
+      root.style.colorScheme = dark ? 'dark' : 'light'
+      root.style.backgroundColor = chromeColor
+      document.body.style.backgroundColor = chromeColor
+      document
+        .querySelector<HTMLMetaElement>('meta[name="theme-color"]')
+        ?.setAttribute('content', chromeColor)
+      document
+        .querySelector<HTMLMetaElement>(
+          'meta[name="apple-mobile-web-app-status-bar-style"]',
+        )
+        ?.setAttribute('content', dark ? 'black-translucent' : 'default')
+    }
+
+    applyTheme()
+    systemTheme.addEventListener('change', applyTheme)
+    if (hydratedRef.current) void saveSettings(settings)
+    return () => systemTheme.removeEventListener('change', applyTheme)
   }, [settings])
 
   useEffect(() => {
