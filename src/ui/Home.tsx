@@ -1,14 +1,17 @@
 import type { GameState } from '../domain/types'
+import type { PwaInstallControl } from '../pwa/usePwaInstall'
 import { DIFFICULTIES, VARIANTS } from '../domain/catalog'
 import {
   ChartIcon,
   ChevronRightIcon,
+  InstallIcon,
   SlidersIcon,
 } from './icons'
 import { formatTime } from './format'
 
 interface HomeProps {
   session: GameState | null
+  install: PwaInstallControl
   updateReady: boolean
   onUpdate: () => void
   onContinue: () => void
@@ -28,6 +31,7 @@ function todayLabel() {
 
 export function Home({
   session,
+  install,
   updateReady,
   onUpdate,
   onContinue,
@@ -119,6 +123,31 @@ export function Home({
             </button>
           )}
         </div>
+
+        {install.kind && (
+          <div className="install-prompt">
+            <button
+              type="button"
+              className="install-action"
+              data-expanded={install.instructionsOpen || undefined}
+              aria-expanded={
+                install.guidance ? install.instructionsOpen : undefined
+              }
+              aria-controls={
+                install.guidance ? 'pwa-install-guidance' : undefined
+              }
+              onClick={() => void install.install()}
+            >
+              <InstallIcon />
+              <span>Instalar o app</span>
+            </button>
+            {install.instructionsOpen && install.guidance && (
+              <p id="pwa-install-guidance" role="status">
+                {install.guidance}
+              </p>
+            )}
+          </div>
+        )}
       </section>
     </main>
   )

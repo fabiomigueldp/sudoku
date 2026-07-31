@@ -6,6 +6,7 @@ import type {
   GameState,
   InputMode,
 } from '../domain/types'
+import { DIGIT_COLOR_MAP } from '../domain/catalog'
 import { candidatesFor, conflictingCells, peersFor } from '../engine'
 import { Board } from './Board'
 import { GameHeader } from './GameHeader'
@@ -118,6 +119,15 @@ export function Game({
       ),
     [game.cells],
   )
+  const activeColor = useMemo(() => {
+    const firstIndex = game.selected.at(0)
+    if (firstIndex === undefined) return null
+    const firstColor = game.cells[firstIndex]?.color ?? null
+    return firstColor !== null &&
+      game.selected.every((index) => game.cells[index]?.color === firstColor)
+      ? firstColor
+      : null
+  }, [game.cells, game.selected])
   const displayedCells = useMemo(() => {
     if (!settings.autoCandidates) return game.cells
     return game.cells.map((cell, index) => {
@@ -158,12 +168,18 @@ export function Game({
 
     if (/^[1-9]$/.test(event.key)) {
       event.preventDefault()
+      const digit = Number(event.key) as Digit
       const directMode = event.ctrlKey || event.metaKey
         ? 'center'
         : event.shiftKey
           ? 'corner'
           : undefined
-      onDigit(Number(event.key) as Digit, directMode)
+      if (game.inputMode === 'color' && directMode === undefined) {
+        const color = DIGIT_COLOR_MAP[digit]
+        if (color !== undefined) onColor(color)
+        return
+      }
+      onDigit(digit, directMode)
       return
     }
 
@@ -211,7 +227,7 @@ export function Game({
             puzzle={game.puzzle}
             selected={game.selected}
             anchor={game.anchor}
-            activeDigit={game.activeDigit}
+            activeDigit={game.inputMode === 'color' ? null : game.activeDigit}
             settings={settings}
             conflicts={conflicts}
             peers={peers}
@@ -240,6 +256,7 @@ export function Game({
           <NumberPad
             mode={game.inputMode}
             activeDigit={game.activeDigit}
+            activeColor={activeColor}
             counts={counts}
             showRemaining={settings.showRemaining}
             canUndo={game.history.length > 0}

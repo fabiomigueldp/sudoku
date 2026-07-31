@@ -41,6 +41,66 @@ describe('game reducer', () => {
     })
   })
 
+  it('keeps value, candidate and color layers independent', () => {
+    let state = createGameState(puzzleWithGivens(), { now: 0 })
+
+    state = reduceGame(state, gameActions.setMode('corner'))
+    state = reduceGame(state, gameActions.setDigit(4))
+    state = reduceGame(state, gameActions.setMode('center'))
+    state = reduceGame(state, gameActions.setDigit(4))
+    expect(state.cells[0]).toMatchObject({
+      value: null,
+      corner: [],
+      center: [4],
+      color: null,
+    })
+
+    state = reduceGame(state, gameActions.setColor('sage'))
+    state = reduceGame(state, gameActions.setMode('value'))
+    state = reduceGame(state, gameActions.setDigit(1))
+    expect(state.cells[0]).toMatchObject({
+      value: 1,
+      corner: [],
+      center: [],
+      color: 'sage',
+    })
+
+    state = reduceGame(state, gameActions.erase())
+    expect(state.cells[0]).toMatchObject({ value: null, color: 'sage' })
+
+    state = reduceGame(state, gameActions.setMode('color'))
+    state = reduceGame(state, gameActions.erase())
+    expect(state.cells[0]?.color).toBeNull()
+  })
+
+  it('colors givens and toggles a multi-cell color change atomically', () => {
+    const givens = Array<number>(81).fill(0)
+    givens[0] = SOLUTION[0] ?? 1
+    let state = createGameState(puzzleWithGivens(givens), { now: 0 })
+
+    state = reduceGame(state, gameActions.select(0))
+    state = reduceGame(state, gameActions.setColor('rose'))
+    expect(state.cells[0]).toMatchObject({
+      given: true,
+      value: SOLUTION[0],
+      color: 'rose',
+    })
+
+    state = reduceGame(state, gameActions.select(1))
+    state = reduceGame(state, gameActions.select(2, 'add'))
+    state = reduceGame(state, gameActions.setColor('sky'))
+    expect(state.cells[1]?.color).toBe('sky')
+    expect(state.cells[2]?.color).toBe('sky')
+
+    state = reduceGame(state, gameActions.setColor('sky'))
+    expect(state.cells[1]?.color).toBeNull()
+    expect(state.cells[2]?.color).toBeNull()
+
+    state = reduceGame(state, gameActions.undo())
+    expect(state.cells[1]?.color).toBe('sky')
+    expect(state.cells[2]?.color).toBe('sky')
+  })
+
   it('undoes a placement and every automatic candidate removal atomically', () => {
     let state = createGameState(puzzleWithGivens(), { now: 0 })
 

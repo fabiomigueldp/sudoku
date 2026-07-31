@@ -6,6 +6,7 @@ import type {
   HintStep,
   PuzzleDefinition,
 } from '../domain/types'
+import { CELL_COLOR_LABELS } from '../domain/catalog'
 
 interface BoardProps {
   cells: CellState[]
@@ -35,7 +36,10 @@ function cellLabel(
     : cell.corner.length || cell.center.length
       ? `vazia${cell.corner.length ? `, marcas de canto ${cell.corner.join(', ')}` : ''}${cell.center.length ? `, marcas centrais ${cell.center.join(', ')}` : ''}`
       : 'vazia'
-  return `Linha ${row}, coluna ${column}, ${content}${conflict ? ', conflito' : ''}${hinted ? ', destacada pela dica' : ''}`
+  const color = cell.color
+    ? `, marcação de cor ${CELL_COLOR_LABELS[cell.color].toLocaleLowerCase('pt-BR')}`
+    : ''
+  return `Linha ${row}, coluna ${column}, ${content}${color}${conflict ? ', conflito' : ''}${hinted ? ', destacada pela dica' : ''}`
 }
 
 const Cell = memo(function Cell({
@@ -138,6 +142,7 @@ const Cell = memo(function Cell({
           )}
         </>
       )}
+      {cell.color && <span className="cell-color-marker" aria-hidden="true" />}
       {hinted && <span className="hint-cell-marker" aria-hidden="true" />}
       {conflict && <span className="conflict-cell-marker" aria-hidden="true" />}
     </button>

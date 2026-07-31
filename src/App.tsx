@@ -35,6 +35,7 @@ import {
   saveSettings,
   snapshotGame,
 } from './game'
+import { usePwaInstall } from './pwa/usePwaInstall'
 import { Game } from './ui/Game'
 import { Home } from './ui/Home'
 import { Library } from './ui/Library'
@@ -138,6 +139,7 @@ function LoadingScreen() {
 }
 
 export function App() {
+  const pwaInstall = usePwaInstall()
   const [screen, setScreen] = useState<Screen>('home')
   const [settings, setSettings] =
     useState<GameSettings>(DEFAULT_SETTINGS)
@@ -585,6 +587,7 @@ export function App() {
       {screen === 'home' && (
         <Home
           session={game}
+          install={pwaInstall}
           updateReady={updateApp !== null}
           onUpdate={() => void updateApp?.(true)}
           onContinue={continueGame}

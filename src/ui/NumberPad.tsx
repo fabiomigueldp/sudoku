@@ -3,7 +3,9 @@ import type {
   Digit,
   InputMode,
 } from '../domain/types'
+import { CELL_COLORS } from '../domain/catalog'
 import {
+  CheckIcon,
   EraserIcon,
   LightbulbIcon,
   RedoIcon,
@@ -13,6 +15,7 @@ import {
 interface NumberPadProps {
   mode: InputMode
   activeDigit: Digit | null
+  activeColor: CellColor | null
   counts: number[]
   showRemaining: boolean
   canUndo: boolean
@@ -29,21 +32,15 @@ interface NumberPadProps {
 
 const modes: Array<{ id: InputMode; label: string; short: string }> = [
   { id: 'value', label: 'Número', short: 'Número' },
-  { id: 'corner', label: 'Cantos', short: 'Canto' },
+  { id: 'corner', label: 'Canto', short: 'Canto' },
   { id: 'center', label: 'Centro', short: 'Centro' },
   { id: 'color', label: 'Cor', short: 'Cor' },
-]
-
-const colors: Array<{ id: CellColor; label: string }> = [
-  { id: 'sage', label: 'Verde sálvia' },
-  { id: 'sky', label: 'Azul céu' },
-  { id: 'sand', label: 'Areia' },
-  { id: 'rose', label: 'Rosa' },
 ]
 
 export function NumberPad({
   mode,
   activeDigit,
+  activeColor,
   counts,
   showRemaining,
   canUndo,
@@ -77,18 +74,29 @@ export function NumberPad({
       </div>
 
       {mode === 'color' ? (
-        <div className="color-pad" aria-label="Cores de marcação">
-          {colors.map((color) => (
-            <button
-              type="button"
-              key={color.id}
-              className="color-key"
-              data-color={color.id}
-              onClick={() => onColor(color.id)}
-            >
-              <span className="sr-only">{color.label}</span>
-            </button>
-          ))}
+        <div
+          className="color-pad"
+          role="group"
+          aria-label="Cores de marcação"
+        >
+          {CELL_COLORS.map((color) => {
+            const active = activeColor === color.id
+            return (
+              <button
+                type="button"
+                key={color.id}
+                className="color-key"
+                data-color={color.id}
+                data-active={active || undefined}
+                aria-pressed={active}
+                aria-keyshortcuts={String(color.shortcut)}
+                aria-label={`${active ? 'Remover' : 'Aplicar'} marcação ${color.label.toLocaleLowerCase('pt-BR')}`}
+                onClick={() => onColor(color.id)}
+              >
+                {active && <CheckIcon />}
+              </button>
+            )
+          })}
         </div>
       ) : (
         <div className="number-pad" aria-label="Números">

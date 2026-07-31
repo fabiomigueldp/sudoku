@@ -7,6 +7,7 @@ import type {
   HintStep,
   InputMode,
 } from '../domain/types'
+import { DIGIT_COLOR_MAP } from '../domain/catalog'
 import { peersFor } from '../engine'
 import { advanceClock, pauseAt, resumeAt } from './clock'
 import {
@@ -85,12 +86,7 @@ export const DEFAULT_REDUCER_OPTIONS: Readonly<GameReducerOptions> = {
   maxHistory: 500,
 }
 
-export const DIGIT_COLOR_MAP: Readonly<Partial<Record<Digit, CellColor>>> = {
-  1: 'sage',
-  2: 'sky',
-  3: 'sand',
-  4: 'rose',
-}
+export { DIGIT_COLOR_MAP } from '../domain/catalog'
 
 function actionTime(action: GameAction): number | null {
   return typeof action.at === 'number' && Number.isFinite(action.at)

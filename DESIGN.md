@@ -192,15 +192,15 @@ Cabeçalhos são baixos, simétricos e previsíveis. Ícones universais podem ap
 
 ### Home
 
-A tela inicial é uma entrada no instrumento, não uma landing page. A assinatura tipográfica “Absolute Sudoku” é o único título; continuar, desafio diário e novo jogo formam uma coluna central única, plana e delimitada por linhas. Não há hero, manifesto, indicadores permanentes de armazenamento ou conectividade. Estados excepcionais, como uma atualização pronta, só aparecem enquanto exigem uma decisão.
+A tela inicial é uma entrada no instrumento, não uma landing page. A assinatura tipográfica “Absolute Sudoku” é o único título; continuar, desafio diário e novo jogo formam uma coluna central única, plana e delimitada por linhas. Não há hero, manifesto, indicadores permanentes de armazenamento ou conectividade. Estados excepcionais, como uma atualização pronta, só aparecem enquanto exigem uma decisão. Em navegadores móveis compatíveis, instalar a PWA é uma ação terciária abaixo do fluxo de jogo: usa o diálogo nativo quando disponível, revela a instrução mínima exigida pelo iOS de forma inline e desaparece no modo instalado.
 
 ### Sudoku Board
 
-A grade é quadrada, sem radius, com limite externo de 2px, divisões de célula de 1px e divisões 3×3 de 2px. Pistas usam tinta e peso 690; entradas usam azul mineral e peso 530. Seleção tem fundo tonal e contorno interno; a dica usa um marcador tracejado mais interno, para ambos permanecerem legíveis quando coexistem. Conflito tem prioridade cromática, mas nunca apaga seleção, dica ou foco. Candidatos de canto mantêm uma matriz 3×3 estável; marcas centrais fluem em um conjunto compacto sem truncamento. Quando ambos coexistem, a célula separa as duas camadas verticalmente e preserva todos os dígitos.
+A grade é quadrada, sem radius, com limite externo de 2px, divisões de célula de 1px e divisões 3×3 de 2px. Pistas usam tinta e peso 690; entradas usam azul mineral e peso 530. Seleção tem fundo tonal e contorno interno; a dica usa um marcador tracejado mais interno, para ambos permanecerem legíveis quando coexistem. Conflito tem prioridade cromática, mas nunca apaga seleção, dica ou foco. Candidatos de canto mantêm uma matriz 3×3 estável; marcas centrais fluem em um conjunto compacto sem truncamento. Quando ambos coexistem, a célula separa as duas camadas verticalmente e preserva todos os dígitos. Uma marcação de cor mantém um traço tonal persistente na base da célula, portanto continua reconhecível sob seleção, pares, dicas e conflitos; seu nome também integra o rótulo acessível da célula.
 
 ### Input Rail
 
-Modo, números e ações formam uma única sequência vertical no desktop e compacta no mobile. Número, canto, centro e cor são modos mutuamente exclusivos. Contagem restante é texto pequeno integrado, nunca badge.
+Modo, números e ações formam uma única sequência vertical no desktop e compacta no mobile. Número, canto, centro e cor são modos mutuamente exclusivos. A paleta de cor indica a marca ativa por forma e estado pressionado, e um segundo acionamento remove a mesma cor da seleção. Apagar atua somente sobre a camada do modo atual. Contagem restante é texto pequeno integrado, nunca badge.
 
 ## Do's and Don'ts
 

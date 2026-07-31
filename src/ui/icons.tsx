@@ -109,6 +109,15 @@ export function CheckIcon(props: IconProps) {
   )
 }
 
+export function InstallIcon(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <path d="M12 3v12M7.5 10.5 12 15l4.5-4.5" />
+      <path d="M5 19h14" />
+    </svg>
+  )
+}
+
 export function CloseIcon(props: IconProps) {
   return (
     <svg {...iconProps} {...props}>
