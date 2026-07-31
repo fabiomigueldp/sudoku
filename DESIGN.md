@@ -137,7 +137,7 @@ A paleta combina papel marfim com tinta azul-grafite; o azul mineral aparece som
 
 ### Hierarchy
 
-- **Display** (690, até 4.7rem, 0.98): somente a tese da tela inicial.
+- **Display** (690, até 4.7rem, 0.98): reservado a momentos editoriais raros; não aparece na tela inicial funcional.
 - **Headline** (690, 1.35rem, 1.2): títulos de páginas e estados conclusivos.
 - **Title** (650, 0.92–1rem, 1.25): opções, linhas e ações principais.
 - **Body** (400, 1rem, 1.65): explicações curtas, sempre abaixo de 65ch.
@@ -189,6 +189,10 @@ O produto é plano por padrão. Profundidade é criada por mudança tonal, linha
 ### Navigation
 
 Cabeçalhos são baixos, simétricos e previsíveis. Ícones universais podem aparecer sem texto visual somente quando mantêm nome acessível. Rotas secundárias usam linhas, não abas em cards.
+
+### Home
+
+A tela inicial é uma entrada no instrumento, não uma landing page. A assinatura tipográfica “Absolute Sudoku” é o único título; continuar, desafio diário e novo jogo formam uma coluna central única, plana e delimitada por linhas. Não há hero, manifesto, indicadores permanentes de armazenamento ou conectividade. Estados excepcionais, como uma atualização pronta, só aparecem enquanto exigem uma decisão.
 
 ### Sudoku Board
 

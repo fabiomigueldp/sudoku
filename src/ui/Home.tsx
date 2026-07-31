@@ -1,7 +1,6 @@
-import type { GameState, PlayerStats } from '../domain/types'
+import type { GameState } from '../domain/types'
 import { DIFFICULTIES, VARIANTS } from '../domain/catalog'
 import {
-  CalendarIcon,
   ChartIcon,
   ChevronRightIcon,
   SlidersIcon,
@@ -10,7 +9,6 @@ import { formatTime } from './format'
 
 interface HomeProps {
   session: GameState | null
-  stats: PlayerStats
   updateReady: boolean
   onUpdate: () => void
   onContinue: () => void
@@ -30,7 +28,6 @@ function todayLabel() {
 
 export function Home({
   session,
-  stats,
   updateReady,
   onUpdate,
   onContinue,
@@ -49,10 +46,10 @@ export function Home({
   return (
     <main className="home-screen">
       <header className="home-header">
-        <a href="#main-action" className="wordmark" aria-label="Absolute Sudoku">
+        <h1 className="wordmark" aria-label="Absolute Sudoku">
           <span>Absolute</span>
           <strong>Sudoku</strong>
-        </a>
+        </h1>
         <nav aria-label="Navegação principal">
           <button
             type="button"
@@ -75,16 +72,7 @@ export function Home({
         </nav>
       </header>
 
-      <section className="home-main" id="main-action">
-        <div className="home-intro">
-          <p className="eyebrow">Seu tempo. Seu raciocínio.</p>
-          <h1>Um tabuleiro para a vida inteira.</h1>
-          <p>
-            Do primeiro single às cadeias mais exigentes. Sem anúncios, sem
-            distrações, sempre disponível.
-          </p>
-        </div>
-
+      <section className="home-main" aria-label="Jogar">
         <div className="home-actions">
           {session && session.status !== 'completed' ? (
             <button
@@ -104,14 +92,13 @@ export function Home({
               </span>
             </button>
           ) : (
-            <button type="button" className="primary-action" onClick={onNew}>
-              Começar um Sudoku
+            <button type="button" className="new-game-action" onClick={onNew}>
+              <strong>Novo Sudoku</strong>
               <ChevronRightIcon />
             </button>
           )}
 
           <button type="button" className="daily-action" onClick={onDaily}>
-            <CalendarIcon />
             <span>
               <small>Desafio diário</small>
               <strong>{todayLabel()}</strong>
@@ -120,25 +107,19 @@ export function Home({
           </button>
 
           {session && session.status !== 'completed' && (
-            <button type="button" className="secondary-action" onClick={onNew}>
-              Novo Sudoku
+            <button type="button" className="new-game-action" onClick={onNew}>
+              <strong>Novo Sudoku</strong>
+              <ChevronRightIcon />
+            </button>
+          )}
+
+          {updateReady && (
+            <button type="button" className="update-action" onClick={onUpdate}>
+              Atualização pronta · aplicar
             </button>
           )}
         </div>
       </section>
-
-      <footer className="home-footer">
-        <p>
-          {updateReady ? (
-            <button type="button" className="update-action" onClick={onUpdate}>
-              Atualização pronta · aplicar
-            </button>
-          ) : stats.completed > 0
-            ? `${stats.completed} ${stats.completed === 1 ? 'grade concluída' : 'grades concluídas'}`
-            : 'Tudo permanece neste dispositivo.'}
-        </p>
-        <span aria-label="Disponível offline">Offline</span>
-      </footer>
     </main>
   )
 }

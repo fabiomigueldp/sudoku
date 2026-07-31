@@ -585,7 +585,6 @@ export function App() {
       {screen === 'home' && (
         <Home
           session={game}
-          stats={stats}
           updateReady={updateApp !== null}
           onUpdate={() => void updateApp?.(true)}
           onContinue={continueGame}

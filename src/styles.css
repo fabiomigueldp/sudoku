@@ -292,13 +292,6 @@
     background: var(--paper-sunken);
   }
 
-  .eyebrow {
-    color: var(--accent);
-    font-size: 0.74rem;
-    font-weight: 720;
-    letter-spacing: 0.105em;
-    text-transform: uppercase;
-  }
 }
 
 @layer layout {
@@ -306,40 +299,24 @@
     display: grid;
     min-height: 100vh;
     min-height: 100dvh;
-    grid-template-rows: auto 1fr auto;
+    grid-template-rows: auto minmax(0, 1fr);
     padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
-  }
-
-  .home-header,
-  .home-footer {
-    width: min(100%, 1160px);
-    margin-inline: auto;
   }
 
   .home-header {
     display: flex;
+    width: min(100%, 760px);
     min-height: 58px;
+    margin-inline: auto;
     align-items: center;
     justify-content: space-between;
   }
 
   .home-main {
-    display: grid;
-    width: min(100%, 960px);
+    width: min(100%, 460px);
     margin: auto;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
-    align-items: center;
-    gap: clamp(48px, 9vw, 120px);
-    padding-block: 56px;
-  }
-
-  .home-footer {
-    display: flex;
-    min-height: 44px;
-    align-items: center;
-    justify-content: space-between;
-    color: var(--ink-faint);
-    font-size: 0.76rem;
+    align-self: center;
+    padding-block: clamp(64px, 12vh, 128px);
   }
 
   .page-screen {
@@ -440,20 +417,22 @@
 @layer components {
   .wordmark {
     display: inline-flex;
+    margin: 0;
     align-items: baseline;
-    gap: 7px;
+    gap: 6px;
     color: var(--ink);
-    text-decoration: none;
-    letter-spacing: -0.025em;
+    line-height: 1;
+    letter-spacing: -0.03em;
   }
 
   .wordmark span {
-    font-size: 0.92rem;
     color: var(--ink-soft);
+    font-size: 1rem;
+    font-weight: 430;
   }
 
   .wordmark strong {
-    font-size: 1rem;
+    font-size: 1.08rem;
     font-weight: 740;
   }
 
@@ -477,49 +456,31 @@
     width: 18px;
   }
 
-  .home-intro {
-    max-width: 33rem;
-  }
-
-  .home-intro h1 {
-    max-width: 12ch;
-    margin-top: 15px;
-    color: var(--ink);
-    font-size: clamp(2.65rem, 5vw, 4.7rem);
-    font-weight: 690;
-    line-height: 0.98;
-    letter-spacing: -0.055em;
-  }
-
-  .home-intro > p:last-child {
-    max-width: 46ch;
-    margin-top: 26px;
-    color: var(--ink-soft);
-    font-size: 1rem;
-    line-height: 1.65;
-  }
-
   .home-actions {
     display: flex;
     flex-direction: column;
-    border-block: 1px solid var(--line);
+    border-top: 1px solid var(--line);
   }
 
   .resume-action,
-  .daily-action {
+  .daily-action,
+  .new-game-action {
     display: flex;
     width: 100%;
-    min-height: 88px;
+    min-height: 84px;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 16px 4px;
+    padding: 15px 4px;
     border: 0;
     border-bottom: 1px solid var(--line);
     background: transparent;
     color: var(--ink);
     text-align: left;
     cursor: pointer;
+    transition:
+      background-color var(--duration-fast) var(--ease-out),
+      color var(--duration-fast) var(--ease-out);
   }
 
   .resume-action > span:first-child,
@@ -535,7 +496,8 @@
   }
 
   .resume-action strong,
-  .daily-action strong {
+  .daily-action strong,
+  .new-game-action strong {
     font-size: 0.98rem;
     font-weight: 650;
   }
@@ -553,40 +515,32 @@
     justify-content: flex-start;
   }
 
-  .daily-action > svg:first-child {
-    width: 22px;
-    margin-right: 4px;
-    color: var(--accent);
-  }
-
   .daily-action > svg:last-child {
     margin-left: auto;
   }
 
-  .home-actions > .primary-action {
-    min-height: 58px;
-    margin-block: 20px;
+  .resume-action svg,
+  .daily-action svg,
+  .new-game-action svg {
+    flex: 0 0 auto;
+    transition: transform var(--duration-fast) var(--ease-out);
   }
 
-  .home-actions > .secondary-action {
-    align-self: flex-start;
-    margin-top: 18px;
-    border: 0;
-    padding-inline: 4px;
-  }
-
-  .home-footer span {
-    letter-spacing: 0.07em;
-    text-transform: uppercase;
+  .resume-action:active,
+  .daily-action:active,
+  .new-game-action:active {
+    background: var(--paper-sunken);
   }
 
   .update-action {
-    min-height: 32px;
-    padding: 0;
+    min-height: 44px;
+    align-self: center;
+    margin-top: 14px;
+    padding: 0 8px;
     border: 0;
     background: transparent;
     color: var(--accent);
-    font-size: inherit;
+    font-size: 0.76rem;
     font-weight: 650;
     cursor: pointer;
   }
@@ -1686,10 +1640,17 @@
 
     .resume-action:hover,
     .daily-action:hover,
+    .new-game-action:hover,
     .choice-row:hover,
     .difficulty-scale button:hover,
     .error-options button:hover {
       color: var(--accent);
+    }
+
+    .resume-action:hover svg,
+    .daily-action:hover svg,
+    .new-game-action:hover svg {
+      transform: translateX(2px);
     }
 
     .primary-action:hover {
@@ -1742,19 +1703,8 @@
 @layer responsive {
   @media (max-width: 800px) {
     .home-main {
-      width: min(100%, 480px);
-      grid-template-columns: 1fr;
-      gap: 44px;
-      padding-block: 58px 40px;
-    }
-
-    .home-intro h1 {
-      max-width: 10ch;
-      font-size: clamp(2.8rem, 13vw, 4rem);
-    }
-
-    .home-intro > p:last-child {
-      font-size: 0.93rem;
+      width: min(100%, 460px);
+      padding-block: clamp(48px, 10vh, 88px);
     }
 
     .home-header .text-icon-button span {
@@ -1887,10 +1837,6 @@
   }
 
   @media (max-width: 440px) {
-    .home-footer p {
-      max-width: 70%;
-    }
-
     .page-header p {
       max-width: 31ch;
     }
@@ -1931,6 +1877,19 @@
 
     .center-notes {
       font-size: clamp(0.43rem, 2.6vw, 0.62rem);
+    }
+  }
+
+  @media (max-height: 620px) {
+    .home-main {
+      align-self: start;
+      padding-block: 24px 36px;
+    }
+
+    .resume-action,
+    .daily-action,
+    .new-game-action {
+      min-height: 72px;
     }
   }
 
