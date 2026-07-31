@@ -18,7 +18,7 @@ function SettingRow({
   onChange,
 }: {
   title: string
-  description: string
+  description?: string
   checked: boolean
   onChange: (checked: boolean) => void
 }) {
@@ -26,7 +26,7 @@ function SettingRow({
     <label className="setting-row">
       <span>
         <strong>{title}</strong>
-        <small>{description}</small>
+        {description && <small>{description}</small>}
       </span>
       <input
         type="checkbox"
@@ -85,7 +85,6 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
         </button>
         <div>
           <h1>Ajustes</h1>
-          <p>Faça a interface desaparecer no seu jeito de jogar.</p>
         </div>
       </header>
 
@@ -186,13 +185,11 @@ export function Settings({ settings, onChange, onBack }: SettingsProps) {
           <h2>Resposta</h2>
           <SettingRow
             title="Háptica"
-            description="Toque sutil em dispositivos compatíveis."
             checked={settings.haptics}
             onChange={(value) => update('haptics', value)}
           />
           <SettingRow
             title="Som"
-            description="Feedback discreto, nunca obrigatório."
             checked={settings.sound}
             onChange={(value) => update('sound', value)}
           />

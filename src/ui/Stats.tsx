@@ -41,7 +41,6 @@ export function Stats({ stats, onBack }: StatsProps) {
         </button>
         <div>
           <h1>Seu jogo</h1>
-          <p>Números para entender o ritmo, não para criar pressão.</p>
         </div>
       </header>
 
