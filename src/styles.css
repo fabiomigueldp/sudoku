@@ -1575,55 +1575,6 @@
 }
 
 @layer states {
-  .sudoku-cell[data-peer] {
-    background: var(--accent-faint);
-  }
-
-  .sudoku-cell[data-match] {
-    background: color-mix(in oklch, var(--accent-soft) 60%, var(--paper-raised));
-    color: var(--accent-strong);
-  }
-
-  .sudoku-cell[data-selected] {
-    z-index: 2;
-    background: var(--accent-soft);
-  }
-
-  .sudoku-cell[data-anchor]::after {
-    position: absolute;
-    z-index: -1;
-    inset: 3px;
-    border: 2px solid var(--accent);
-    content: "";
-    pointer-events: none;
-  }
-
-  .sudoku-cell[data-hint]::before {
-    position: absolute;
-    z-index: -1;
-    inset: 7%;
-    border: 2px dashed var(--accent);
-    border-radius: 50%;
-    content: "";
-    pointer-events: none;
-  }
-
-  .sudoku-cell[data-conflict] {
-    background: var(--danger-soft);
-    color: var(--danger);
-  }
-
-  .sudoku-cell[data-conflict]::before {
-    position: absolute;
-    right: 9%;
-    bottom: 9%;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--danger);
-    content: "";
-  }
-
   .sudoku-cell[data-color="sage"] {
     background: var(--sage);
   }
@@ -1644,6 +1595,63 @@
       [data-color]
     ) {
     background: color-mix(in oklch, var(--accent-faint) 42%, var(--paper-raised));
+  }
+
+  .sudoku-cell[data-peer] {
+    background: var(--accent-faint);
+  }
+
+  .sudoku-cell[data-match] {
+    background: color-mix(in oklch, var(--accent-soft) 60%, var(--paper-raised));
+    color: var(--accent-strong);
+  }
+
+  .sudoku-cell[data-selected] {
+    z-index: 2;
+    background: var(--accent-soft);
+  }
+
+  .sudoku-cell[data-hint]:not([data-selected]):not([data-conflict]) {
+    background: color-mix(in oklch, var(--accent-soft) 72%, var(--paper-raised));
+  }
+
+  .sudoku-cell[data-conflict] {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  .sudoku-cell[data-selected][data-conflict]:not([data-anchor]) {
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+
+  .sudoku-cell[data-anchor]::after {
+    position: absolute;
+    z-index: 2;
+    inset: 3px;
+    border: 2px solid var(--accent);
+    content: "";
+    pointer-events: none;
+  }
+
+  .hint-cell-marker {
+    position: absolute;
+    z-index: 3;
+    inset: clamp(5px, 18%, 8px);
+    border: 1.5px dashed var(--accent);
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  .conflict-cell-marker {
+    position: absolute;
+    z-index: 4;
+    right: 9%;
+    bottom: 9%;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--danger);
+    pointer-events: none;
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -1670,7 +1678,9 @@
       background: var(--paper-sunken);
     }
 
-    .sudoku-cell:hover {
+    .sudoku-cell:hover:not([data-selected]):not([data-hint]):not(
+        [data-conflict]
+      ) {
       background: var(--accent-faint);
     }
 
@@ -1689,6 +1699,10 @@
     }
 
     .sudoku-cell[data-anchor]::after {
+      border-color: Highlight;
+    }
+
+    .hint-cell-marker {
       border-color: Highlight;
     }
 

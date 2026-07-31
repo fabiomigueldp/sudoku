@@ -22,7 +22,12 @@ interface BoardProps {
   onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void
 }
 
-function cellLabel(cell: CellState, index: number, conflict: boolean) {
+function cellLabel(
+  cell: CellState,
+  index: number,
+  conflict: boolean,
+  hinted: boolean,
+) {
   const row = Math.floor(index / 9) + 1
   const column = (index % 9) + 1
   const content = cell.value
@@ -30,7 +35,7 @@ function cellLabel(cell: CellState, index: number, conflict: boolean) {
     : cell.corner.length || cell.center.length
       ? `vazia, candidatos ${[...cell.corner, ...cell.center].join(', ')}`
       : 'vazia'
-  return `Linha ${row}, coluna ${column}, ${content}${conflict ? ', conflito' : ''}`
+  return `Linha ${row}, coluna ${column}, ${content}${conflict ? ', conflito' : ''}${hinted ? ', destacada pela dica' : ''}`
 }
 
 const Cell = memo(function Cell({
@@ -84,7 +89,7 @@ const Cell = memo(function Cell({
       data-hint={hinted || undefined}
       data-diagonal={diagonal || undefined}
       data-color={cell.color ?? undefined}
-      aria-label={cellLabel(cell, index, conflict)}
+      aria-label={cellLabel(cell, index, conflict, hinted)}
       aria-selected={selected}
       aria-invalid={conflict || undefined}
       aria-rowindex={Math.floor(index / 9) + 1}
@@ -122,6 +127,8 @@ const Cell = memo(function Cell({
           )}
         </>
       )}
+      {hinted && <span className="hint-cell-marker" aria-hidden="true" />}
+      {conflict && <span className="conflict-cell-marker" aria-hidden="true" />}
     </button>
   )
 })
