@@ -6,7 +6,7 @@ import {
   ChevronRightIcon,
   SlidersIcon,
 } from './icons'
-import { formatTime } from './GameHeader'
+import { formatTime } from './format'
 
 interface HomeProps {
   session: GameState | null

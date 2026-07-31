@@ -16,7 +16,6 @@ import {
 import { assertPuzzleDefinition, BOARD_SIZE } from './state'
 import {
   addGameRecord,
-  cloneStats,
   createGameRecord,
   dailyDateFromPuzzle,
   type CompletionResult,

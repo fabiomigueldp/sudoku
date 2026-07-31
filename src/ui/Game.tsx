@@ -49,8 +49,8 @@ interface GameProps {
   onHome: () => void
 }
 
-function boardValues(game: GameState) {
-  return game.cells.map((cell) => cell.value ?? 0)
+function boardValues(cells: GameState['cells']) {
+  return cells.map((cell) => cell.value ?? 0)
 }
 
 export function Game({
@@ -81,7 +81,7 @@ export function Game({
   onNew,
   onHome,
 }: GameProps) {
-  const values = useMemo(() => boardValues(game), [game.cells])
+  const values = useMemo(() => boardValues(game.cells), [game.cells])
   const peers = useMemo(
     () =>
       new Set(
@@ -222,7 +222,6 @@ export function Game({
           />
           {game.status === 'paused' && (
             <PauseOverlay
-              puzzle={game.puzzle}
               elapsedMs={game.elapsedMs}
               onResume={onPause}
               onExit={onBack}

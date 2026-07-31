@@ -1,4 +1,5 @@
-import type { GameState, HintStep, PuzzleDefinition } from '../domain/types'
+import { useEffect, useRef } from 'react'
+import type { GameState, HintStep } from '../domain/types'
 import { VARIANTS } from '../domain/catalog'
 import {
   CheckIcon,
@@ -8,15 +9,22 @@ import {
   PlayIcon,
   SlidersIcon,
 } from './icons'
-import { formatTime } from './GameHeader'
+import { formatTime } from './format'
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',')
 
 export function PauseOverlay({
-  puzzle,
   elapsedMs,
   onResume,
   onExit,
 }: {
-  puzzle: PuzzleDefinition
   elapsedMs: number
   onResume: () => void
   onExit: () => void
@@ -103,14 +111,95 @@ export function GameMenu({
   onCopy: () => void
   copied: boolean
 }) {
+  const layerRef = useRef<HTMLDivElement>(null)
+  const dialogRef = useRef<HTMLElement>(null)
+  const initialFocusRef = useRef<HTMLButtonElement>(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    const layer = layerRef.current
+    const dialog = dialogRef.current
+    if (layer === null || dialog === null) return
+
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    const siblings = Array.from(layer.parentElement?.children ?? [])
+      .filter((element): element is HTMLElement =>
+        element instanceof HTMLElement && element !== layer,
+      )
+      .map((element) => ({ element, inert: element.inert }))
+
+    for (const { element } of siblings) element.inert = true
+    const frame = window.requestAnimationFrame(() => {
+      initialFocusRef.current?.focus({ preventScroll: true })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      for (const { element, inert } of siblings) element.inert = inert
+      if (previousFocus?.isConnected) {
+        previousFocus.focus({ preventScroll: true })
+      }
+    }
+  }, [])
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onCloseRef.current()
+      return
+    }
+
+    if (event.key !== 'Tab') return
+    const dialog = dialogRef.current
+    if (dialog === null) return
+    const focusable = Array.from(
+      dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ).filter((element) => element.getClientRects().length > 0)
+    const first = focusable[0]
+    const last = focusable.at(-1)
+    if (first === undefined || last === undefined) {
+      event.preventDefault()
+      dialog.focus()
+      return
+    }
+
+    const active = document.activeElement
+    if (event.shiftKey && (active === first || !dialog.contains(active))) {
+      event.preventDefault()
+      last.focus()
+    } else if (
+      !event.shiftKey &&
+      (active === last || !dialog.contains(active))
+    ) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+
   return (
-    <div className="sheet-layer" role="presentation" onMouseDown={onClose}>
+    <div
+      ref={layerRef}
+      className="sheet-layer"
+      role="presentation"
+      onMouseDown={onClose}
+    >
       <section
+        ref={dialogRef}
         className="game-sheet"
         role="dialog"
         aria-modal="true"
         aria-labelledby="game-options-title"
+        tabIndex={-1}
         onMouseDown={(event) => event.stopPropagation()}
+        onKeyDown={handleKeyDown}
       >
         <header>
           <h2 id="game-options-title">Partida</h2>
@@ -119,7 +208,7 @@ export function GameMenu({
             <span className="sr-only">Fechar</span>
           </button>
         </header>
-        <button type="button" onClick={onCheck}>
+        <button ref={initialFocusRef} type="button" onClick={onCheck}>
           <CheckIcon />
           <span>
             <strong>Verificar grade</strong>

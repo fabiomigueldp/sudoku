@@ -1,7 +1,7 @@
 import { DIFFICULTIES, VARIANTS } from '../domain/catalog'
 import type { PlayerStats } from '../domain/types'
 import { ArrowLeftIcon } from './icons'
-import { formatTime } from './GameHeader'
+import { formatTime } from './format'
 
 interface StatsProps {
   stats: PlayerStats

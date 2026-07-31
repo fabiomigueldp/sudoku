@@ -42,7 +42,7 @@ const Cell = memo(function Cell({
   cell,
   index,
   selected,
-  anchor,
+  isAnchor,
   matched,
   peer,
   conflict,
@@ -55,7 +55,7 @@ const Cell = memo(function Cell({
   cell: CellState
   index: number
   selected: boolean
-  anchor: boolean
+  isAnchor: boolean
   matched: boolean
   peer: boolean
   conflict: boolean
@@ -81,7 +81,7 @@ const Cell = memo(function Cell({
         .filter(Boolean)
         .join(' ')}
       data-selected={selected || undefined}
-      data-anchor={anchor || undefined}
+      data-anchor={isAnchor || undefined}
       data-given={cell.given || undefined}
       data-match={matched || undefined}
       data-peer={peer || undefined}
@@ -103,7 +103,7 @@ const Cell = memo(function Cell({
       aria-invalid={conflict || undefined}
       aria-rowindex={Math.floor(index / 9) + 1}
       aria-colindex={(index % 9) + 1}
-      tabIndex={anchor ? 0 : -1}
+      tabIndex={isAnchor ? 0 : -1}
       onClick={(event) =>
         onSelect(
           index,
@@ -182,7 +182,7 @@ export function Board({
                   cell={cell}
                   index={index}
                   selected={selectedSet.has(index)}
-                  anchor={index === anchor}
+                  isAnchor={index === anchor}
                   matched={
                     settings.highlightMatches &&
                     anchorValue !== null &&
