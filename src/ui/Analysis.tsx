@@ -1,15 +1,22 @@
 import { useMemo, useState } from 'react'
 import { DIFFICULTIES, VARIANTS } from '../domain/catalog'
-import type { GameSettings, GameState } from '../domain/types'
+import type { GameSettings, GameState, HintStep } from '../domain/types'
 import {
   analyzeDifficulty,
   conflictingCells,
+  practiceTechniqueDefinition,
   type DifficultyTechnique,
+  type LogicalTechnique,
 } from '../engine'
 import {
-  replayEventLog,
+  buildReviewFrames,
+  practiceTechniqueFromPuzzle,
   type GameEvent,
   type GameEventLog,
+  type ReplaySettings,
+  type ReviewAssessment,
+  type ReviewDelta,
+  type ReviewFrame,
 } from '../game'
 import { Board } from './Board'
 import { formatTime } from './format'
@@ -17,21 +24,11 @@ import { ArrowLeftIcon } from './icons'
 
 interface AnalysisProps {
   game: GameState
-  eventLog: GameEventLog
+  eventLog: GameEventLog | null
   settings: GameSettings
+  replaySettings: ReplaySettings
   onBack: () => void
 }
-
-const REVIEWED_ACTIONS = new Set<GameEvent['action']['type']>([
-  'input/digit',
-  'input/color',
-  'input/erase',
-  'history/undo',
-  'history/redo',
-  'hint/show',
-  'hint/apply',
-  'game/restart',
-])
 
 const TECHNIQUE_NAMES: Readonly<Record<DifficultyTechnique, string>> = {
   none: 'Leitura direta',
@@ -83,35 +80,116 @@ function eventTitle(event: GameEvent | null, state: GameState): string {
   return 'Movimento'
 }
 
+function deltaDescription(delta: ReviewDelta): string | null {
+  const parts: string[] = []
+  if (delta.valuesPlaced > 0) {
+    parts.push(
+      `${delta.valuesPlaced} ${delta.valuesPlaced === 1 ? 'número inserido' : 'números inseridos'}`,
+    )
+  }
+  if (delta.valuesRemoved > 0) {
+    parts.push(
+      `${delta.valuesRemoved} ${delta.valuesRemoved === 1 ? 'número removido' : 'números removidos'}`,
+    )
+  }
+  if (delta.candidatesAdded > 0) {
+    parts.push(`${delta.candidatesAdded} candidatos adicionados`)
+  }
+  if (delta.candidatesRemoved > 0) {
+    parts.push(`${delta.candidatesRemoved} candidatos removidos`)
+  }
+  if (delta.colorsChanged > 0) {
+    parts.push(
+      `${delta.colorsChanged} ${delta.colorsChanged === 1 ? 'cor alterada' : 'cores alteradas'}`,
+    )
+  }
+  return parts.length === 0 ? null : parts.join(' · ')
+}
+
+function assessmentDescription(
+  assessment: ReviewAssessment,
+  technique: LogicalTechnique | null,
+): string {
+  const techniqueName = technique === null
+    ? null
+    : TECHNIQUE_NAMES[technique]
+  if (assessment === 'logical-match' && techniqueName !== null) {
+    return `A jogada acompanha ${techniqueName}.`
+  }
+  if (assessment === 'valid-alternative') {
+    return techniqueName === null
+      ? 'Jogada válida.'
+      : `Jogada válida por um caminho diferente de ${techniqueName}.`
+  }
+  if (assessment === 'incorrect') {
+    return 'O valor não coincide com a solução desta grade.'
+  }
+  if (assessment === 'assistance') return 'Momento de assistência.'
+  if (assessment === 'revision') return 'Revisão do caminho anterior.'
+  if (assessment === 'annotation') return 'Anotação de apoio ao raciocínio.'
+  return 'Estado inicial da grade.'
+}
+
+function logicalHint(frame: ReviewFrame): HintStep | null {
+  const step = frame.logicalStep
+  if (step === null) return null
+  const hint: HintStep = {
+    technique: step.technique,
+    title: TECHNIQUE_NAMES[step.technique],
+    explanation: assessmentDescription(frame.assessment, step.technique),
+    cells: step.cells,
+    phase: 3,
+  }
+  const digit = step.digits[0]
+  if (digit !== undefined) hint.digit = digit
+  return hint
+}
+
+function importantLabel(frame: ReviewFrame): string {
+  const movement = `Movimento ${frame.position}`
+  if (frame.assessment === 'incorrect') return `${movement} · Revisar valor`
+  if (frame.assessment === 'assistance') return `${movement} · Assistência`
+  if (frame.assessment === 'revision') return `${movement} · Revisão`
+  if (frame.logicalStep !== null) {
+    return `${movement} · ${TECHNIQUE_NAMES[frame.logicalStep.technique]}`
+  }
+  return movement
+}
+
 export function Analysis({
   game,
   eventLog,
   settings,
+  replaySettings,
   onBack,
 }: AnalysisProps) {
-  const reviewedEvents = useMemo(
-    () => eventLog.events.filter((event) => REVIEWED_ACTIONS.has(event.action.type)),
-    [eventLog.events],
-  )
-  const [position, setPosition] = useState(reviewedEvents.length)
-  const selectedEvent = position === 0
-    ? null
-    : (reviewedEvents[position - 1] ?? null)
-  const sequence = selectedEvent?.sequence ?? 0
-  const replayed = useMemo(
-    () =>
-      replayEventLog(
+  const frames = useMemo(() => {
+    if (eventLog === null) {
+      return [
         {
-          ...eventLog,
-          events: eventLog.events.filter((event) => event.sequence <= sequence),
+          position: 0,
+          event: null,
+          state: game,
+          delta: {
+            cells: [],
+            valuesPlaced: 0,
+            valuesRemoved: 0,
+            candidatesAdded: 0,
+            candidatesRemoved: 0,
+            colorsChanged: 0,
+          },
+          logicalStep: null,
+          assessment: 'initial' as const,
+          important: false,
         },
-        {
-          autoRemoveCandidates: settings.autoRemoveCandidates,
-          errorPolicy: settings.errorPolicy,
-        },
-      ),
-    [eventLog, sequence, settings.autoRemoveCandidates, settings.errorPolicy],
-  )
+      ]
+    }
+    return buildReviewFrames(eventLog, replaySettings)
+  }, [eventLog, game, replaySettings])
+  const [position, setPosition] = useState(frames.length - 1)
+  const frame = frames[Math.min(position, frames.length - 1)] as ReviewFrame
+  const movementCount = Math.max(0, frames.length - 1)
+  const importantFrames = frames.filter((entry) => entry.important)
   const difficulty = useMemo(
     () => analyzeDifficulty(game.puzzle.givens, game.puzzle.variant),
     [game.puzzle],
@@ -120,11 +198,11 @@ export function Analysis({
     () =>
       new Set(
         conflictingCells(
-          replayed.cells.map((cell) => cell.value ?? 0),
-          replayed.puzzle.variant,
+          frame.state.cells.map((cell) => cell.value ?? 0),
+          frame.state.puzzle.variant,
         ),
       ),
-    [replayed.cells, replayed.puzzle.variant],
+    [frame.state.cells, frame.state.puzzle.variant],
   )
   const reviewSettings = useMemo(
     () => ({
@@ -140,6 +218,20 @@ export function Analysis({
   const difficultyName =
     DIFFICULTIES.find((item) => item.id === game.puzzle.difficulty)?.name ??
     game.puzzle.difficulty
+  const practiceTechnique = practiceTechniqueFromPuzzle(game.puzzle)
+  const practiceDefinition =
+    practiceTechnique === null
+      ? null
+      : practiceTechniqueDefinition(practiceTechnique)
+  const contextName =
+    practiceDefinition === null
+      ? `${variantName} · ${difficultyName}`
+      : `Prática · ${practiceDefinition.name}`
+  const deltaText = deltaDescription(frame.delta)
+  const pattern = logicalHint(frame)
+  const selected =
+    frame.delta.cells.length > 0 ? frame.delta.cells : frame.state.selected
+  const anchor = frame.delta.cells[0] ?? frame.state.anchor
 
   return (
     <main className="page-screen analysis-screen">
@@ -150,58 +242,76 @@ export function Analysis({
         </button>
         <div>
           <h1>Análise</h1>
-          <p>{variantName} · {difficultyName}</p>
+          <p>{contextName}</p>
         </div>
       </header>
 
       <div className="analysis-layout">
         <section className="analysis-board" aria-label="Reprodução da partida">
           <Board
-            cells={replayed.cells}
-            puzzle={replayed.puzzle}
-            selected={replayed.selected}
-            anchor={replayed.anchor}
-            activeDigit={replayed.activeDigit}
+            cells={frame.state.cells}
+            puzzle={frame.state.puzzle}
+            selected={selected}
+            anchor={anchor}
+            activeDigit={frame.state.activeDigit}
             settings={reviewSettings}
             conflicts={conflicts}
             peers={new Set<number>()}
-            hint={replayed.hint}
+            hint={pattern}
             readOnly
             onSelect={() => undefined}
             onDragSelect={() => undefined}
             onKeyDown={() => undefined}
           />
+          {pattern && (
+            <p className="analysis-legend">
+              O traço interno indica o padrão lógico disponível antes desta jogada.
+            </p>
+          )}
         </section>
 
         <section className="analysis-inspector" aria-label="Linha do tempo">
           <div className="analysis-step" aria-live="polite">
             <small>
-              {position === 0
-                ? 'Início'
-                : `Movimento ${position} de ${reviewedEvents.length}`}
+              {eventLog === null
+                ? 'Estado final'
+                : position === 0
+                  ? 'Início'
+                  : `Movimento ${position} de ${movementCount}`}
             </small>
-            <h2>{eventTitle(selectedEvent, replayed)}</h2>
+            <h2>{eventLog === null ? 'Grade concluída' : eventTitle(frame.event, frame.state)}</h2>
             <p>
-              {position === 0
-                ? 'A grade antes do primeiro movimento.'
-                : selectionDescription(replayed)}
+              {eventLog === null
+                ? 'Esta partida foi salva sem uma linha do tempo reproduzível.'
+                : position === 0
+                  ? 'A grade antes do primeiro movimento.'
+                  : selectionDescription(frame.state)}
             </p>
+            {position > 0 && (
+              <p className="analysis-assessment">
+                {assessmentDescription(
+                  frame.assessment,
+                  frame.logicalStep?.technique ?? null,
+                )}
+              </p>
+            )}
+            {deltaText && <p className="analysis-delta">{deltaText}</p>}
           </div>
 
-          {reviewedEvents.length > 0 && (
+          {movementCount > 0 && (
             <>
               <input
                 className="analysis-range"
                 type="range"
                 min={0}
-                max={reviewedEvents.length}
+                max={movementCount}
                 step={1}
                 value={position}
                 aria-label="Posição na partida"
                 aria-valuetext={
                   position === 0
                     ? 'Início'
-                    : `Movimento ${position} de ${reviewedEvents.length}`
+                    : `Movimento ${position} de ${movementCount}`
                 }
                 onChange={(event) => setPosition(Number(event.target.value))}
               />
@@ -217,11 +327,9 @@ export function Analysis({
                 <button
                   type="button"
                   className="secondary-action"
-                  disabled={position === reviewedEvents.length}
+                  disabled={position === movementCount}
                   onClick={() =>
-                    setPosition((current) =>
-                      Math.min(reviewedEvents.length, current + 1),
-                    )
+                    setPosition((current) => Math.min(movementCount, current + 1))
                   }
                 >
                   Próximo
@@ -230,7 +338,32 @@ export function Analysis({
             </>
           )}
 
+          {importantFrames.length > 0 && (
+            <label className="analysis-moments">
+              <span>Momentos importantes</span>
+              <select
+                value={frame.important ? frame.position : ''}
+                onChange={(event) => {
+                  if (event.target.value) setPosition(Number(event.target.value))
+                }}
+              >
+                <option value="">Ir para…</option>
+                {importantFrames.map((important) => (
+                  <option key={important.position} value={important.position}>
+                    {importantLabel(important)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+
           <dl className="analysis-facts">
+            {practiceDefinition !== null && (
+              <div>
+                <dt>Técnica praticada</dt>
+                <dd>{practiceDefinition.name}</dd>
+              </div>
+            )}
             <div>
               <dt>Técnica mais avançada</dt>
               <dd>{TECHNIQUE_NAMES[difficulty.hardestTechnique]}</dd>
@@ -253,6 +386,10 @@ export function Analysis({
                   ? 'Sem dicas'
                   : `${game.hintsUsed} ${game.hintsUsed === 1 ? 'dica' : 'dicas'}`}
               </dd>
+            </div>
+            <div>
+              <dt>Erros</dt>
+              <dd>{game.mistakes}</dd>
             </div>
           </dl>
         </section>

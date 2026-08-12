@@ -10,7 +10,7 @@ A versão publicada do projeto está disponível em
 
 ## Versionamento
 
-A versão atual é `0.2.0`. O histórico técnico por versão está em
+A versão atual é `0.5.0`. O histórico técnico por versão está em
 [CHANGELOG.md](CHANGELOG.md), com escopo funcional, alterações de arquitetura e
 marcadores de compatibilidade.
 
@@ -18,11 +18,13 @@ O projeto segue SemVer. Cada release deve atualizar `package.json` e
 `package-lock.json`, registrar a mudança no changelog e manter explícitos os
 marcadores de formato persistido. Alterações no algoritmo determinístico de
 geração devem incrementar `GENERATOR_VERSION`; alterações incompatíveis no
-event log ou no armazenamento devem atualizar seus respectivos schemas e
-documentar a migração.
+event log, no arquivo, na prática ou no backup devem atualizar seus respectivos
+schemas e documentar a migração.
 
-Marcadores atuais: `GENERATOR_VERSION = 3`, `EVENT_LOG_VERSION = 1` e
-`STORAGE_SCHEMA_VERSION = 2`.
+Marcadores atuais: `GENERATOR_VERSION = 3`, `EVENT_LOG_VERSION = 1`,
+`STORAGE_SCHEMA_VERSION = 3`, `ARCHIVED_GAME_VERSION = 1`,
+`PRACTICE_VERSION = 1`, `PRACTICE_PROGRESS_VERSION = 1` e
+`DATA_BACKUP_VERSION = 1`.
 
 ## O que já está incluído
 
@@ -35,9 +37,16 @@ Marcadores atuais: `GENERATOR_VERSION = 3`, `EVENT_LOG_VERSION = 1` e
 - Undo/redo integral, dicas progressivas, quatro políticas de erro, pausa e
   cronômetro que ignora o tempo em segundo plano.
 - Autosave serializado no IndexedDB, migrações, fallback seguro, estatísticas
-  locais e retomada após recarga ou encerramento.
+  locais, arquivo permanente de partidas e retomada após recarga ou
+  encerramento.
 - Histórico de eventos por partida e análise pós-jogo, com reprodução de cada
-  movimento e leitura da técnica mais avançada exigida pela grade.
+  movimento, mudanças realizadas, comparação com o caminho lógico e acesso
+  direto aos momentos que merecem revisão.
+- Prática offline por dez técnicas, dos singles ao XY-Wing, com grades
+  determinísticas calibradas, variações preservadoras de lógica e progresso
+  separado das estatísticas de partidas comuns.
+- Backup integral em JSON com verificação de integridade, prévia antes da
+  restauração e exclusão local explícita em duas etapas.
 - Importação de grades com validação de unicidade e compartilhamento do estado
   completo por código versionado.
 - Temas claro, escuro e do sistema, alto contraste, redução de movimento,
@@ -65,9 +74,10 @@ Comandos principais:
 ## Arquitetura
 
 - `src/domain`: regras, catálogo e modelos de Sudoku independentes da interface.
-- `src/engine`: topologia, solver exato, solver humano, gerador e Web Worker.
+- `src/engine`: topologia, solver exato, solver humano, gerador, prática por
+  técnica e Web Worker.
 - `src/game`: reducer, histórico reversível, event log, relógio, persistência,
-  estatísticas e share.
+  arquivo, revisão semântica, estatísticas, backup e share.
 - `src/ui`: aplicação React e experiência adaptativa.
 - `public`: ícones e ativos estáticos instaláveis.
 - `vite.config.ts`: manifesto, precache e ciclo de atualização do PWA.
@@ -76,6 +86,20 @@ O estado é local e a geração é determinística por seed. A calibração cobr
 singles, candidatos bloqueados, pares, trincas, quartetos, X-Wing, Skyscraper,
 Swordfish, XY-Wing e Jellyfish. A camada de domínio permanece pura e testável;
 React cuida somente da interação e da apresentação.
+
+## Dados locais e backup
+
+Partidas em andamento, preferências, estatísticas, práticas e partidas
+concluídas permanecem neste dispositivo. Em **Ajustes → Dados**, “Exportar
+backup” cria um arquivo JSON portátil; “Restaurar backup” valida formato,
+versão, integridade e conteúdo antes de pedir confirmação. A restauração
+substitui o conjunto local completo. “Apagar dados” exige uma segunda ação e
+remove todo o conteúdo local do aplicativo.
+
+O arquivo de partidas fica em **Seu jogo**. Partidas novas preservam o estado
+final e, quando o log é compatível, toda a linha do tempo. Registros antigos que
+existiam apenas nas estatísticas continuam visíveis, mas não podem reconstruir
+movimentos que nunca foram armazenados.
 
 ## PWA e modo offline
 

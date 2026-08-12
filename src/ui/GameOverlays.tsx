@@ -350,11 +350,13 @@ export function GameMenu({
 
 export function CompletionOverlay({
   game,
+  contextLabel,
   onHome,
   onAgain,
   onAnalyze,
 }: {
   game: GameState
+  contextLabel?: string | undefined
   onHome: () => void
   onAgain: () => void
   onAnalyze?: (() => void) | undefined
@@ -380,7 +382,8 @@ export function CompletionOverlay({
         Grade concluída
       </p>
       <h2>
-        {VARIANTS.find((item) => item.id === game.puzzle.variant)?.name}
+        {contextLabel ??
+          VARIANTS.find((item) => item.id === game.puzzle.variant)?.name}
       </h2>
       <dl>
         <div>

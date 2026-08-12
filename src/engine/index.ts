@@ -69,6 +69,15 @@ export {
 export { dailySeed, localDateKey } from './daily'
 export { findHint } from './hints'
 export {
+  PRACTICE_TECHNIQUES,
+  PRACTICE_VERSION,
+  generatePracticePuzzleInWorker,
+  practiceSessionSeed,
+  practiceTechniqueDefinition,
+  transformPracticePuzzle,
+  type PracticeTechniqueDefinition,
+} from './practice'
+export {
   createSeededRandom,
   hashSeed,
   type SeededRandom,

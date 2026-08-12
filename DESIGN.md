@@ -202,6 +202,22 @@ A grade é quadrada, sem radius, com limite externo de 2px, divisões de célula
 
 Modo, números e ações formam uma única sequência vertical no desktop e compacta no mobile. Número, canto, centro e cor são modos mutuamente exclusivos. A paleta de cor indica a marca ativa por forma e estado pressionado, e um segundo acionamento remove a mesma cor da seleção. Apagar atua somente sobre a camada do modo atual. Contagem restante é texto pequeno integrado, nunca badge.
 
+### Practice
+
+A prática é uma biblioteca de padrões, não uma trilha gamificada. Técnicas são agrupadas por família em listas planas, com nome, uma frase de reconhecimento e histórico discreto. Não há níveis bloqueados, pontuações ou pressão por sequência. Ao entrar numa grade, o contexto “Prática · técnica” substitui o rótulo de dificuldade e permanece consistente até a conclusão e a análise.
+
+### Archive
+
+O arquivo integra a atividade em “Seu jogo”. Cada linha comunica contexto, data, tempo, erros e assistência; a seta aparece somente quando o estado completo está disponível para revisão. Registros históricos sem tabuleiro continuam legíveis como linhas estáticas. A lista cresce por revelação explícita, mantendo a primeira leitura curta sem destruir o histórico permanente.
+
+### Analysis
+
+A análise usa o mesmo tabuleiro, agora somente leitura. O movimento atual domina; abaixo dele aparecem apenas a interpretação semântica e a diferença produzida. O traço interno representa o padrão lógico disponível antes da jogada e nunca compete com seleção ou conflito. Um controle temporal contínuo serve à exploração fina, enquanto “Momentos importantes” oferece saltos para erros, assistência, revisões e técnicas avançadas.
+
+### Local Data
+
+Backup, restauração e exclusão vivem em uma única seção plana dos ajustes. Ações potencialmente destrutivas nunca se confirmam por toast ou diálogo genérico: a própria seção revela resumo, consequência e botões explícitos. Restauração e exclusão são estados mutuamente exclusivos. O perigo usa cor apenas como reforço; verbo, texto e segunda ação carregam o significado principal.
+
 ## Do's and Don'ts
 
 ### Do:

@@ -46,6 +46,7 @@ interface GameProps {
   onSettings: () => void
   onCopy: () => void
   copied: boolean
+  contextLabel?: string | undefined
   onNew: () => void
   onHome: () => void
   onAnalyze?: (() => void) | undefined
@@ -80,6 +81,7 @@ export function Game({
   onSettings,
   onCopy,
   copied,
+  contextLabel,
   onNew,
   onHome,
   onAnalyze,
@@ -217,6 +219,7 @@ export function Game({
         elapsedMs={game.elapsedMs}
         showTimer={settings.showTimer}
         status={game.status}
+        contextLabel={contextLabel}
         onBack={onBack}
         onPause={onPause}
         onMore={() => onMenu(true)}
@@ -290,6 +293,7 @@ export function Game({
       {game.status === 'completed' && (
         <CompletionOverlay
           game={game}
+          contextLabel={contextLabel}
           onHome={onHome}
           onAgain={onNew}
           onAnalyze={onAnalyze}

@@ -5,6 +5,7 @@ import { ArrowLeftIcon, CheckIcon, ChevronRightIcon } from './icons'
 
 interface LibraryProps {
   onBack: () => void
+  onPractice: () => void
   onStart: (variant: VariantId, difficulty: DifficultyId) => void
   onImport: (
     value: string,
@@ -17,6 +18,7 @@ interface LibraryProps {
 
 export function Library({
   onBack,
+  onPractice,
   onStart,
   onImport,
   generating,
@@ -151,6 +153,16 @@ export function Library({
               </button>
             </form>
           )}
+        </section>
+
+        <section className="practice-entry" aria-label="Prática por técnica">
+          <button type="button" onClick={onPractice}>
+            <span>
+              <strong>Praticar uma técnica</strong>
+              <small>Padrões específicos em grades calibradas.</small>
+            </span>
+            <ChevronRightIcon />
+          </button>
         </section>
 
         <aside className="selection-summary">

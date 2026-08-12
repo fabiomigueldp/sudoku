@@ -52,6 +52,36 @@ export {
 } from './events'
 
 export {
+  ARCHIVED_GAME_VERSION,
+  archivedGameSummary,
+  createArchivedGame,
+  gameKindFromState,
+  practiceTechniqueFromPuzzle,
+  replayMatchesArchivedState,
+  replaySettingsFromGameSettings,
+  type ArchivedGame,
+  type ArchivedGameSummary,
+  type GameKind,
+  type ReplaySettings,
+} from './archive'
+
+export {
+  EMPTY_PRACTICE_PROGRESS,
+  PRACTICE_PROGRESS_VERSION,
+  addPracticeRecord,
+  createPracticeRecord,
+  type PracticeProgress,
+  type PracticeRecord,
+} from './practiceProgress'
+
+export {
+  buildReviewFrames,
+  type ReviewAssessment,
+  type ReviewDelta,
+  type ReviewFrame,
+} from './review'
+
+export {
   addGameRecord,
   bestTime,
   cloneStats,
@@ -66,12 +96,21 @@ export {
 
 export {
   STORAGE_SCHEMA_VERSION,
+  clearAllStoredData,
   clearActiveSession,
+  listArchivedGames,
+  listArchivedGameSummaries,
   loadActiveSession,
+  loadArchivedGame,
+  loadPracticeProgress,
   loadSettings,
+  loadStoredDataSnapshot,
   loadStats,
+  migrateArchivedGame,
   migrateSession,
+  replaceStoredData,
   resetFallbackStorageForTests,
+  sanitizePracticeProgress,
   sanitizeSettings,
   sanitizeStats,
   saveActiveSession,
@@ -82,9 +121,21 @@ export {
   type LoadSessionOptions,
   type PersistedGameSession,
   type SaveCompletionOptions,
+  type StoredDataSnapshot,
   type StorageBackend,
   type StorageWriteResult,
 } from './persistence'
+
+export {
+  DATA_BACKUP_FORMAT,
+  DATA_BACKUP_VERSION,
+  SudokuBackupError,
+  exportDataBackup,
+  parseDataBackup,
+  restoreDataBackup,
+  type BackupRestoreResult,
+  type BackupSummary,
+} from './backup'
 
 export {
   GAME_SNAPSHOT_PREFIX,

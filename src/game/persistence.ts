@@ -10,9 +10,27 @@ import type {
 } from '../domain/types'
 import { DEFAULT_SETTINGS, EMPTY_STATS } from '../domain/catalog'
 import {
+  ARCHIVED_GAME_VERSION,
+  archivedGameSummary,
+  createArchivedGame,
+  replayMatchesArchivedState,
+  type ArchivedGame,
+  type ArchivedGameSummary,
+  type GameKind,
+  type ReplaySettings,
+} from './archive'
+import {
   EVENT_LOG_VERSION,
   type GameEventLog,
 } from './events'
+import {
+  EMPTY_PRACTICE_PROGRESS,
+  PRACTICE_PROGRESS_VERSION,
+  addPracticeRecord,
+  createPracticeRecord,
+  type PracticeProgress,
+  type PracticeRecord,
+} from './practiceProgress'
 import { assertPuzzleDefinition, BOARD_SIZE } from './state'
 import {
   addGameRecord,
@@ -21,19 +39,22 @@ import {
   type CompletionResult,
 } from './stats'
 
-export const STORAGE_SCHEMA_VERSION = 2
-const DATABASE_VERSION = 2
+export const STORAGE_SCHEMA_VERSION = 3
+const DATABASE_VERSION = 4
 const DATABASE_NAME = 'absolute-sudoku'
 
 const ACTIVE_SESSION_KEY = 'active' as const
 const SETTINGS_KEY = 'game' as const
 const STATS_KEY = 'player' as const
+const PRACTICE_KEY = 'progress' as const
 const METADATA_KEY = 'schema' as const
 
 const FALLBACK_KEYS = {
   session: 'absolute-sudoku:session:v2',
   settings: 'absolute-sudoku:settings:v2',
   stats: 'absolute-sudoku:stats:v2',
+  archives: 'absolute-sudoku:archives:v1',
+  practice: 'absolute-sudoku:practice:v1',
 } as const
 
 export interface PersistedGameSession {
@@ -61,6 +82,20 @@ interface AbsoluteSudokuDatabase extends DBSchema {
     key: typeof STATS_KEY
     value: PlayerStats
   }
+  archives: {
+    key: string
+    value: ArchivedGame
+    indexes: { 'by-completed-at': number }
+  }
+  archiveIndex: {
+    key: string
+    value: ArchivedGameSummary
+    indexes: { 'by-completed-at': number }
+  }
+  practice: {
+    key: typeof PRACTICE_KEY
+    value: PracticeProgress
+  }
   metadata: {
     key: typeof METADATA_KEY
     value: StorageMetadata
@@ -86,27 +121,42 @@ export interface SaveCompletionOptions {
   completedAt?: number
   dailyDate?: string | null
   recordId?: string
+  eventLog?: GameEventLog | null
+  replaySettings?: ReplaySettings
+  kind?: GameKind
+}
+
+export interface StoredDataSnapshot {
+  session: PersistedGameSession | null
+  settings: GameSettings
+  stats: PlayerStats
+  archives: ArchivedGame[]
+  practice: PracticeProgress
 }
 
 interface FallbackMemory {
   session: PersistedGameSession | null
   settings: GameSettings | null
   stats: PlayerStats | null
+  archives: ArchivedGame[]
+  practice: PracticeProgress | null
 }
 
 const fallbackMemory: FallbackMemory = {
   session: null,
   settings: null,
   stats: null,
+  archives: [],
+  practice: null,
 }
 
 let databasePromise: Promise<IDBPDatabase<AbsoluteSudokuDatabase> | null> | null =
   null
-let sessionWriteQueue: Promise<void> = Promise.resolve()
+let storageWriteQueue: Promise<void> = Promise.resolve()
 
-function enqueueSessionWrite<T>(work: () => Promise<T>): Promise<T> {
-  const result = sessionWriteQueue.then(work, work)
-  sessionWriteQueue = result.then(
+function enqueueStorageWrite<T>(work: () => Promise<T>): Promise<T> {
+  const result = storageWriteQueue.then(work, work)
+  storageWriteQueue = result.then(
     () => undefined,
     () => undefined,
   )
@@ -167,7 +217,14 @@ function readFallback(
 
 function hasStore(
   database: IDBPDatabase<AbsoluteSudokuDatabase>,
-  name: 'sessions' | 'settings' | 'stats' | 'metadata',
+  name:
+    | 'sessions'
+    | 'settings'
+    | 'stats'
+    | 'archives'
+    | 'archiveIndex'
+    | 'practice'
+    | 'metadata',
 ): boolean {
   return database.objectStoreNames.contains(name)
 }
@@ -188,10 +245,24 @@ async function database(): Promise<IDBPDatabase<AbsoluteSudokuDatabase> | null> 
         if (!hasStore(db, 'sessions')) db.createObjectStore('sessions')
         if (!hasStore(db, 'settings')) db.createObjectStore('settings')
         if (!hasStore(db, 'stats')) db.createObjectStore('stats')
+        if (!hasStore(db, 'archives')) {
+          const archives = db.createObjectStore('archives')
+          archives.createIndex('by-completed-at', 'state.completedAt')
+        } else {
+          const archives = transaction.objectStore('archives')
+          if (!archives.indexNames.contains('by-completed-at')) {
+            archives.createIndex('by-completed-at', 'state.completedAt')
+          }
+        }
+        if (!hasStore(db, 'archiveIndex')) {
+          const archiveIndex = db.createObjectStore('archiveIndex')
+          archiveIndex.createIndex('by-completed-at', 'completedAt')
+        }
+        if (!hasStore(db, 'practice')) db.createObjectStore('practice')
         if (!hasStore(db, 'metadata')) db.createObjectStore('metadata')
 
-        // v1 used the same core stores. v2 adds explicit schema metadata and
-        // versioned session envelopes; values are migrated lazily on read.
+        // v3 adds permanent completed-game archives and technique practice.
+        // Earlier core values remain compatible and migrate lazily on read.
         if (oldVersion < DATABASE_VERSION) {
           void transaction.objectStore('metadata').put(
             {
@@ -379,6 +450,115 @@ function validEventLog(value: unknown): value is GameEventLog {
   )
 }
 
+const PRACTICE_TECHNIQUES = new Set([
+  'naked-single',
+  'hidden-single',
+  'locked-candidates-pointing',
+  'locked-candidates-claiming',
+  'naked-pair',
+  'hidden-pair',
+  'naked-triple',
+  'hidden-triple',
+  'naked-quad',
+  'hidden-quad',
+  'x-wing',
+  'skyscraper',
+  'swordfish',
+  'xy-wing',
+  'jellyfish',
+])
+
+function validReplaySettings(value: unknown): value is ReplaySettings {
+  return (
+    isObject(value) &&
+    typeof value.autoRemoveCandidates === 'boolean' &&
+    (value.errorPolicy === 'conflicts' ||
+      value.errorPolicy === 'solution' ||
+      value.errorPolicy === 'on-demand' ||
+      value.errorPolicy === 'completion')
+  )
+}
+
+export function migrateArchivedGame(value: unknown): ArchivedGame | null {
+  if (!isObject(value) || !validState(value.state)) return null
+  if (value.state.status !== 'completed' || value.state.completedAt === null) {
+    return null
+  }
+  const kind =
+    value.kind === 'daily' ||
+    value.kind === 'practice' ||
+    value.kind === 'standard'
+      ? value.kind
+      : 'standard'
+  const practiceTechnique =
+    kind === 'practice' &&
+    typeof value.practiceTechnique === 'string' &&
+    PRACTICE_TECHNIQUES.has(value.practiceTechnique)
+      ? value.practiceTechnique
+      : null
+  const replaySettings = validReplaySettings(value.replaySettings)
+    ? value.replaySettings
+    : {
+        autoRemoveCandidates: DEFAULT_SETTINGS.autoRemoveCandidates,
+        errorPolicy: DEFAULT_SETTINGS.errorPolicy,
+      }
+  const eventLog =
+    validEventLog(value.eventLog) &&
+    replayMatchesArchivedState(value.state, value.eventLog, replaySettings)
+      ? value.eventLog
+      : null
+  return {
+    version: ARCHIVED_GAME_VERSION,
+    id:
+      typeof value.id === 'string'
+        ? value.id
+        : `${value.state.puzzle.id}:${value.state.completedAt}`,
+    savedAt:
+      typeof value.savedAt === 'number' && Number.isFinite(value.savedAt)
+        ? value.savedAt
+        : value.state.completedAt,
+    kind,
+    practiceTechnique,
+    state: cloneJson(value.state),
+    eventLog: eventLog === null ? null : cloneJson(eventLog),
+    replaySettings: { ...replaySettings },
+  } as ArchivedGame
+}
+
+function validPracticeRecord(value: unknown): value is PracticeRecord {
+  return (
+    isObject(value) &&
+    typeof value.id === 'string' &&
+    typeof value.puzzleId === 'string' &&
+    typeof value.technique === 'string' &&
+    PRACTICE_TECHNIQUES.has(value.technique) &&
+    typeof value.elapsedMs === 'number' &&
+    Number.isFinite(value.elapsedMs) &&
+    value.elapsedMs >= 0 &&
+    typeof value.mistakes === 'number' &&
+    Number.isFinite(value.mistakes) &&
+    value.mistakes >= 0 &&
+    typeof value.hintsUsed === 'number' &&
+    Number.isFinite(value.hintsUsed) &&
+    value.hintsUsed >= 0 &&
+    typeof value.completedAt === 'number' &&
+    Number.isFinite(value.completedAt)
+  )
+}
+
+export function sanitizePracticeProgress(value: unknown): PracticeProgress {
+  const source = isObject(value) ? value : {}
+  const records = Array.isArray(source.records)
+    ? source.records
+        .filter(validPracticeRecord)
+        .map((record) => ({ ...record }))
+    : []
+  return {
+    version: PRACTICE_PROGRESS_VERSION,
+    records: [...new Map(records.map((record) => [record.id, record])).values()],
+  }
+}
+
 /**
  * Accepts both the current envelope and the original direct-state/v1 shapes.
  * Invalid or partial sessions are ignored instead of blocking app startup.
@@ -533,7 +713,7 @@ export function saveActiveSession(
     state: cloneJson(state),
     eventLog: eventLog === null ? null : cloneJson(eventLog),
   }
-  return enqueueSessionWrite(async () => {
+  return enqueueStorageWrite(async () => {
     try {
       const db = await database()
       if (db !== null) {
@@ -568,7 +748,7 @@ export async function loadActiveSession(
 }
 
 export function clearActiveSession(): Promise<StorageWriteResult> {
-  return enqueueSessionWrite(async () => {
+  return enqueueStorageWrite(async () => {
     writeFallback('session', FALLBACK_KEYS.session, null)
     try {
       const db = await database()
@@ -585,15 +765,17 @@ export async function saveSettings(
   settings: GameSettings,
 ): Promise<StorageWriteResult> {
   const safe = sanitizeSettings(settings)
-  writeFallback('settings', FALLBACK_KEYS.settings, safe)
-  try {
-    const db = await database()
-    if (db === null) return { backend: 'fallback' }
-    await db.put('settings', safe, SETTINGS_KEY)
-    return { backend: 'indexeddb' }
-  } catch {
-    return { backend: 'fallback' }
-  }
+  return enqueueStorageWrite(async () => {
+    writeFallback('settings', FALLBACK_KEYS.settings, safe)
+    try {
+      const db = await database()
+      if (db === null) return { backend: 'fallback' }
+      await db.put('settings', safe, SETTINGS_KEY)
+      return { backend: 'indexeddb' }
+    } catch {
+      return { backend: 'fallback' }
+    }
+  })
 }
 
 export async function loadSettings(): Promise<GameSettings> {
@@ -607,15 +789,17 @@ export async function saveStats(
   stats: PlayerStats,
 ): Promise<StorageWriteResult> {
   const safe = sanitizeStats(stats)
-  writeFallback('stats', FALLBACK_KEYS.stats, safe)
-  try {
-    const db = await database()
-    if (db === null) return { backend: 'fallback' }
-    await db.put('stats', safe, STATS_KEY)
-    return { backend: 'indexeddb' }
-  } catch {
-    return { backend: 'fallback' }
-  }
+  return enqueueStorageWrite(async () => {
+    writeFallback('stats', FALLBACK_KEYS.stats, safe)
+    try {
+      const db = await database()
+      if (db === null) return { backend: 'fallback' }
+      await db.put('stats', safe, STATS_KEY)
+      return { backend: 'indexeddb' }
+    } catch {
+      return { backend: 'fallback' }
+    }
+  })
 }
 
 export async function loadStats(): Promise<PlayerStats> {
@@ -623,6 +807,98 @@ export async function loadStats(): Promise<PlayerStats> {
     (await readDatabaseStore('stats', STATS_KEY)) ??
     readFallback('stats', FALLBACK_KEYS.stats)
   return sanitizeStats(stored)
+}
+
+function sanitizeArchives(value: unknown): ArchivedGame[] {
+  if (!Array.isArray(value)) return []
+  const archives = value.flatMap((entry) => {
+    const archived = migrateArchivedGame(entry)
+    return archived === null ? [] : [archived]
+  })
+  return [...new Map(archives.map((archive) => [archive.id, archive])).values()]
+}
+
+export async function listArchivedGames(): Promise<ArchivedGame[]> {
+  try {
+    const db = await database()
+    if (db !== null) {
+      const archives = sanitizeArchives(await db.getAll('archives'))
+      return archives.sort(
+        (left, right) =>
+          (right.state.completedAt ?? right.savedAt) -
+          (left.state.completedAt ?? left.savedAt),
+      )
+    }
+  } catch {
+    // Continue with the local fallback mirror.
+  }
+  return sanitizeArchives(
+    readFallback('archives', FALLBACK_KEYS.archives),
+  ).sort(
+    (left, right) =>
+      (right.state.completedAt ?? right.savedAt) -
+      (left.state.completedAt ?? left.savedAt),
+  )
+}
+
+export async function listArchivedGameSummaries(): Promise<
+  ArchivedGameSummary[]
+> {
+  try {
+    const db = await database()
+    if (db !== null) {
+      const summaries = await db.getAll('archiveIndex')
+      return summaries
+        .filter(
+          (summary) =>
+            typeof summary.id === 'string' &&
+            typeof summary.completedAt === 'number' &&
+            Number.isFinite(summary.completedAt),
+        )
+        .map((summary) => ({ ...summary }))
+        .sort((left, right) => right.completedAt - left.completedAt)
+    }
+  } catch {
+    // Continue with archive values from the fallback mirror.
+  }
+  return sanitizeArchives(
+    readFallback('archives', FALLBACK_KEYS.archives),
+  )
+    .map(archivedGameSummary)
+    .sort((left, right) => right.completedAt - left.completedAt)
+}
+
+export async function loadArchivedGame(
+  id: string,
+): Promise<ArchivedGame | null> {
+  if (!id) return null
+  try {
+    const db = await database()
+    if (db !== null) return migrateArchivedGame(await db.get('archives', id))
+  } catch {
+    // Continue with the local fallback mirror.
+  }
+  return (
+    sanitizeArchives(readFallback('archives', FALLBACK_KEYS.archives)).find(
+      (entry) => entry.id === id,
+    ) ?? null
+  )
+}
+
+export async function loadPracticeProgress(): Promise<PracticeProgress> {
+  try {
+    const db = await database()
+    if (db !== null) {
+      return sanitizePracticeProgress(
+        await db.get('practice', PRACTICE_KEY),
+      )
+    }
+  } catch {
+    // Continue with the local fallback mirror.
+  }
+  return sanitizePracticeProgress(
+    readFallback('practice', FALLBACK_KEYS.practice),
+  )
 }
 
 export async function saveGameCompletion(
@@ -638,30 +914,183 @@ export async function saveGameCompletion(
     options.dailyDate === undefined
       ? dailyDateFromPuzzle(state)
       : options.dailyDate
+  const replaySettings = options.replaySettings ?? {
+    autoRemoveCandidates: DEFAULT_SETTINGS.autoRemoveCandidates,
+    errorPolicy: DEFAULT_SETTINGS.errorPolicy,
+  }
+  const inferredArchive = createArchivedGame(
+    state,
+    options.eventLog ?? null,
+    replaySettings,
+  )
+  const archiveWithKind: ArchivedGame =
+    options.kind === undefined || options.kind === inferredArchive.kind
+      ? inferredArchive
+      : {
+          ...inferredArchive,
+          kind: options.kind,
+          practiceTechnique:
+            options.kind === 'practice'
+              ? inferredArchive.practiceTechnique
+              : null,
+        }
+  const archive: ArchivedGame = {
+    ...archiveWithKind,
+    id: record.id,
+  }
+  const practiceRecord = createPracticeRecord(state)
 
-  const db = await database()
-  if (db !== null) {
-    try {
-      const transaction = db.transaction('stats', 'readwrite')
-      const current = sanitizeStats(
-        (await transaction.store.get(STATS_KEY)) ?? EMPTY_STATS,
-      )
-      const stats = addGameRecord(current, record, dailyDate)
-      await transaction.store.put(stats, STATS_KEY)
-      await transaction.done
-      writeFallback('stats', FALLBACK_KEYS.stats, stats)
-      return { record, stats }
-    } catch {
-      // Continue with the serialized fallback path.
+  return enqueueStorageWrite(async () => {
+    const db = await database()
+    if (db !== null) {
+      try {
+        const transaction = db.transaction(
+          ['stats', 'archives', 'archiveIndex', 'practice'],
+          'readwrite',
+        )
+        const statsStore = transaction.objectStore('stats')
+        const archiveStore = transaction.objectStore('archives')
+        const archiveIndexStore = transaction.objectStore('archiveIndex')
+        const practiceStore = transaction.objectStore('practice')
+        const currentStats = sanitizeStats(
+          (await statsStore.get(STATS_KEY)) ?? EMPTY_STATS,
+        )
+        const currentPractice = sanitizePracticeProgress(
+          (await practiceStore.get(PRACTICE_KEY)) ?? EMPTY_PRACTICE_PROGRESS,
+        )
+        const stats =
+          archive.kind === 'practice'
+            ? currentStats
+            : addGameRecord(currentStats, record, dailyDate)
+        const practice =
+          archive.kind === 'practice' && practiceRecord !== null
+            ? addPracticeRecord(currentPractice, practiceRecord)
+            : currentPractice
+
+        await archiveStore.put(archive, archive.id)
+        await archiveIndexStore.put(archivedGameSummary(archive), archive.id)
+        await statsStore.put(stats, STATS_KEY)
+        await practiceStore.put(practice, PRACTICE_KEY)
+        await transaction.done
+
+        const fallbackArchives = sanitizeArchives(
+          readFallback('archives', FALLBACK_KEYS.archives),
+        ).filter((entry) => entry.id !== archive.id)
+        writeFallback('archives', FALLBACK_KEYS.archives, [
+          ...fallbackArchives,
+          archive,
+        ])
+        writeFallback('stats', FALLBACK_KEYS.stats, stats)
+        writeFallback('practice', FALLBACK_KEYS.practice, practice)
+        return { record, stats }
+      } catch {
+        // Continue with the serialized fallback path.
+      }
     }
+
+    const currentStats = sanitizeStats(
+      readFallback('stats', FALLBACK_KEYS.stats) ?? EMPTY_STATS,
+    )
+    const currentPractice = sanitizePracticeProgress(
+      readFallback('practice', FALLBACK_KEYS.practice),
+    )
+    const stats =
+      archive.kind === 'practice'
+        ? currentStats
+        : addGameRecord(currentStats, record, dailyDate)
+    const practice =
+      archive.kind === 'practice' && practiceRecord !== null
+        ? addPracticeRecord(currentPractice, practiceRecord)
+        : currentPractice
+    const archives = sanitizeArchives(
+      readFallback('archives', FALLBACK_KEYS.archives),
+    ).filter((entry) => entry.id !== archive.id)
+    writeFallback('archives', FALLBACK_KEYS.archives, [...archives, archive])
+    writeFallback('stats', FALLBACK_KEYS.stats, stats)
+    writeFallback('practice', FALLBACK_KEYS.practice, practice)
+    return { record, stats }
+  })
+}
+
+export async function loadStoredDataSnapshot(): Promise<StoredDataSnapshot> {
+  const [session, settings, stats, archives, practice] = await Promise.all([
+    loadActiveSession({ rebaseRunningClock: false }),
+    loadSettings(),
+    loadStats(),
+    listArchivedGames(),
+    loadPracticeProgress(),
+  ])
+  return { session, settings, stats, archives, practice }
+}
+
+export function replaceStoredData(
+  snapshot: StoredDataSnapshot,
+): Promise<StorageWriteResult> {
+  const safe: StoredDataSnapshot = {
+    session:
+      snapshot.session === null ? null : migrateSession(snapshot.session),
+    settings: sanitizeSettings(snapshot.settings),
+    stats: sanitizeStats(snapshot.stats),
+    archives: sanitizeArchives(snapshot.archives),
+    practice: sanitizePracticeProgress(snapshot.practice),
   }
 
-  const current = sanitizeStats(
-    readFallback('stats', FALLBACK_KEYS.stats) ?? EMPTY_STATS,
-  )
-  const stats = addGameRecord(current, record, dailyDate)
-  writeFallback('stats', FALLBACK_KEYS.stats, stats)
-  return { record, stats }
+  return enqueueStorageWrite(async () => {
+    writeFallback('session', FALLBACK_KEYS.session, safe.session)
+    writeFallback('settings', FALLBACK_KEYS.settings, safe.settings)
+    writeFallback('stats', FALLBACK_KEYS.stats, safe.stats)
+    writeFallback('archives', FALLBACK_KEYS.archives, safe.archives)
+    writeFallback('practice', FALLBACK_KEYS.practice, safe.practice)
+
+    try {
+      const db = await database()
+      if (db === null) return { backend: 'fallback' }
+      const transaction = db.transaction(
+        [
+          'sessions',
+          'settings',
+          'stats',
+          'archives',
+          'archiveIndex',
+          'practice',
+        ],
+        'readwrite',
+      )
+      const sessions = transaction.objectStore('sessions')
+      const settings = transaction.objectStore('settings')
+      const stats = transaction.objectStore('stats')
+      const archives = transaction.objectStore('archives')
+      const archiveIndex = transaction.objectStore('archiveIndex')
+      const practice = transaction.objectStore('practice')
+      await sessions.clear()
+      await archives.clear()
+      await archiveIndex.clear()
+      if (safe.session !== null) {
+        await sessions.put(safe.session, ACTIVE_SESSION_KEY)
+      }
+      await settings.put(safe.settings, SETTINGS_KEY)
+      await stats.put(safe.stats, STATS_KEY)
+      for (const archived of safe.archives) {
+        await archives.put(archived, archived.id)
+        await archiveIndex.put(archivedGameSummary(archived), archived.id)
+      }
+      await practice.put(safe.practice, PRACTICE_KEY)
+      await transaction.done
+      return { backend: 'indexeddb' }
+    } catch {
+      return { backend: 'fallback' }
+    }
+  })
+}
+
+export function clearAllStoredData(): Promise<StorageWriteResult> {
+  return replaceStoredData({
+    session: null,
+    settings: DEFAULT_SETTINGS,
+    stats: EMPTY_STATS,
+    archives: [],
+    practice: EMPTY_PRACTICE_PROGRESS,
+  })
 }
 
 export async function storageBackend(): Promise<StorageBackend> {
@@ -676,6 +1105,8 @@ export function resetFallbackStorageForTests(): void {
   fallbackMemory.session = null
   fallbackMemory.settings = null
   fallbackMemory.stats = null
+  fallbackMemory.archives = []
+  fallbackMemory.practice = null
   const storage = localStorageOrNull()
   if (storage !== null) {
     for (const key of Object.values(FALLBACK_KEYS)) {
@@ -688,5 +1119,5 @@ export function resetFallbackStorageForTests(): void {
   }
   void databasePromise?.then((db) => db?.close())
   databasePromise = null
-  sessionWriteQueue = Promise.resolve()
+  storageWriteQueue = Promise.resolve()
 }

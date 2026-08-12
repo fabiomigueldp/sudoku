@@ -15,9 +15,110 @@ with the relevant implementation details.
   its seed namespace changes. The value is embedded in generated-game and
   daily-challenge seeds and in puzzle fingerprints.
 - `EVENT_LOG_VERSION` identifies the replayable action-log format.
-  `STORAGE_SCHEMA_VERSION` identifies the persisted session envelope. Any
-  incompatible change to either format requires a schema increment and an
-  explicit migration note.
+  `STORAGE_SCHEMA_VERSION` identifies the persisted-data envelope. Archive,
+  practice, and backup formats have independent version markers. Any
+  incompatible change requires a schema increment and an explicit migration
+  note.
+
+## [0.5.0] - 2026-08-12
+
+This release completes the local-first archive, focused technique practice,
+and semantic post-game review milestones. It intentionally ships them as one
+coherent data and learning release instead of exposing intermediate formats.
+
+### Added
+
+#### Permanent game archive
+
+- Added a versioned `ArchivedGame` format that preserves every newly completed
+  game, including its final state, completion metadata, replay settings, game
+  kind, and event log when that log reproduces the archived board exactly.
+- Added a lightweight archive index for fast activity-list loading and a full
+  archive store for on-demand replay. Completed standard, daily, and practice
+  games remain available without a backend.
+- Extended the statistics screen with a permanent chronological archive,
+  replay navigation, incremental history disclosure, mistake counts, and
+  compatibility rows for legacy summary-only records.
+- Added safe degradation for old or incompatible logs: the completed board is
+  retained and remains reviewable even when its original timeline cannot be
+  reconstructed.
+
+#### Complete local backup lifecycle
+
+- Added a portable, versioned JSON backup containing the active session,
+  settings, statistics, completed-game archive, replay logs, and practice
+  progress.
+- Added deterministic payload integrity verification, strict archive/session
+  migration, a restore preview, explicit replacement confirmation, and a 50 MB
+  import guard.
+- Added two-step local-data deletion. Backup, restore, and deletion are exposed
+  as quiet inline actions in Settings rather than modal interruptions or toast
+  notifications.
+- Serialized all persistence mutations through one write queue so autosave,
+  completion, restore, settings, and deletion cannot finish out of order.
+
+#### Technique practice
+
+- Added an offline practice library for ten human-solving techniques: naked
+  and hidden singles, pointing and claiming locked candidates, naked and
+  hidden pairs, naked triples, X-Wing, Skyscraper, and XY-Wing.
+- Added deterministic technique-targeted generation in the existing Web
+  Worker. Curated base seeds are validated against the logical path and then
+  transformed through Sudoku-preserving symmetries and digit permutations,
+  producing varied sessions without network access or compromising uniqueness.
+- Added separate practice progress with session count, clean completions, and
+  median time per technique. Practice sessions are archived but do not distort
+  normal solve statistics.
+- Added practice context to Home, the game header, completion, archive rows,
+  and post-game analysis.
+
+#### Semantic post-game review
+
+- Replaced state-only replay inspection with a frame model that classifies
+  value entries, candidate work, colors, assistance, revision, incorrect
+  values, valid alternative paths, and moves matching the logical solver.
+- Added per-step board deltas, logical-pattern overlays, short explanations,
+  an important-moment navigator, mistake totals, and static final-state review
+  for games without a compatible log.
+- Stored the candidate-removal setting on digit events so replay remains exact
+  if the player changes that preference during a game.
+
+### Changed
+
+- Upgraded persisted storage to schema 3 and IndexedDB layout 4 with dedicated
+  `archives`, `archiveIndex`, and `practice` stores. Existing sessions,
+  settings, and statistics migrate lazily and remain readable.
+- Completion writes now update statistics, archive, archive index, and practice
+  progress atomically in IndexedDB, with a mirrored fallback path.
+- Extended generator requests with an optional target technique used only by
+  practice. Normal generator-v3 seeds and puzzle fingerprints remain unchanged,
+  so existing daily challenges and shared identities stay compatible.
+- Refined archive-only statistics, mutually exclusive restore/delete
+  confirmations, responsive practice layouts, and analysis typography without
+  introducing cards, badges, gamification, or routine toasts.
+
+### Validation
+
+- Added deterministic practice coverage for all ten published techniques,
+  uniqueness, target-path presence, rotational clue symmetry, and repeatable
+  transforms.
+- Added archive, replay-compatibility, full backup/restore, checksum-corruption,
+  and semantic review tests.
+
+### Compatibility markers
+
+- Application version: `0.5.0`
+- `GENERATOR_VERSION`: `3`
+- `EVENT_LOG_VERSION`: `1`
+- `STORAGE_SCHEMA_VERSION`: `3`
+- `ARCHIVED_GAME_VERSION`: `1`
+- `PRACTICE_VERSION`: `1`
+- `PRACTICE_PROGRESS_VERSION`: `1`
+- `DATA_BACKUP_VERSION`: `1`
+- Existing generator-v3 puzzle identities are preserved. Existing schema-2
+  sessions are migrated in place. Legacy statistical summaries remain listed,
+  while only games completed after this release can include a permanent board
+  and replay timeline.
 
 ## [0.2.0] - 2026-08-12
 
@@ -154,4 +255,3 @@ listed here so the Git history remains searchable by technical scope:
 | [`ca87406`](https://github.com/fabiomigueldp/sudoku/commit/ca87406) | Home-screen simplification and focused action hierarchy. |
 | [`449247b`](https://github.com/fabiomigueldp/sudoku/commit/449247b) | Removal of nonessential interface copy. |
 | [`5f0a1de`](https://github.com/fabiomigueldp/sudoku/commit/5f0a1de) | Input-mode refinements and mobile PWA installation support. |
-

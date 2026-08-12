@@ -1,4 +1,5 @@
 import type { DifficultyId, PuzzleDefinition, VariantId } from '../domain/types'
+import type { LogicalTechnique } from './analyzer'
 import {
   generatePuzzle,
   type GeneratePuzzleOptions,
@@ -9,6 +10,7 @@ import {
 export interface WorkerGenerationOptions {
   generatedAt?: number
   signal?: AbortSignal
+  targetTechnique?: LogicalTechnique
 }
 
 let nextRequestId = 0
@@ -37,6 +39,9 @@ export function generatePuzzleInWorker(
     }
     if (options.generatedAt !== undefined) {
       generationOptions.generatedAt = options.generatedAt
+    }
+    if (options.targetTechnique !== undefined) {
+      generationOptions.targetTechnique = options.targetTechnique
     }
     return Promise.resolve(generatePuzzle(generationOptions))
   }
@@ -88,6 +93,9 @@ export function generatePuzzleInWorker(
     }
     if (options.generatedAt !== undefined) {
       request.generatedAt = options.generatedAt
+    }
+    if (options.targetTechnique !== undefined) {
+      request.targetTechnique = options.targetTechnique
     }
     worker.postMessage(request)
   })

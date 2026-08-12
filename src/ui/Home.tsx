@@ -1,6 +1,8 @@
 import type { GameState } from '../domain/types'
 import type { PwaInstallControl } from '../pwa/usePwaInstall'
 import { DIFFICULTIES, VARIANTS } from '../domain/catalog'
+import { practiceTechniqueDefinition } from '../engine'
+import { practiceTechniqueFromPuzzle } from '../game'
 import {
   ChartIcon,
   ChevronRightIcon,
@@ -46,6 +48,12 @@ export function Home({
   const sessionDifficulty = session
     ? DIFFICULTIES.find((item) => item.id === session.puzzle.difficulty)?.name
     : null
+  const sessionPractice = session
+    ? practiceTechniqueFromPuzzle(session.puzzle)
+    : null
+  const sessionLabel = sessionPractice === null
+    ? `${sessionVariant} · ${sessionDifficulty}`
+    : `Prática · ${practiceTechniqueDefinition(sessionPractice)?.name ?? sessionPractice}`
 
   return (
     <main className="home-screen">
@@ -87,7 +95,7 @@ export function Home({
               <span>
                 <small>Continuar</small>
                 <strong>
-                  {sessionVariant} · {sessionDifficulty}
+                  {sessionLabel}
                 </strong>
               </span>
               <span className="resume-meta">

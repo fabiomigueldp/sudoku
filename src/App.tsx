@@ -19,36 +19,69 @@ import {
   dailySeed,
   findHint,
   GENERATOR_VERSION,
+  generatePracticePuzzleInWorker,
   generatePuzzleInWorker,
+  practiceTechniqueDefinition,
+  type LogicalTechnique,
 } from './engine'
 import {
   appendGameEvent,
+  clearAllStoredData,
   createEventLog,
   createGameState,
+  EMPTY_PRACTICE_PROGRESS,
+  exportDataBackup,
   exportGameSnapshot,
   gameActions,
   importGameSnapshot,
+  listArchivedGameSummaries,
   loadActiveSession,
+  loadArchivedGame,
+  loadPracticeProgress,
   loadSettings,
   loadStats,
+  parseDataBackup,
+  practiceTechniqueFromPuzzle,
   reduceGame,
   parseImportedPuzzle,
+  replaySettingsFromGameSettings,
+  restoreDataBackup,
   saveActiveSession,
   saveGameCompletion,
   saveSettings,
+  type ArchivedGameSummary,
+  type BackupRestoreResult,
+  type BackupSummary,
   type GameAction,
   type GameEventLog,
+  type PracticeProgress,
+  type ReplaySettings,
 } from './game'
 import { usePwaInstall } from './pwa/usePwaInstall'
 import { Analysis } from './ui/Analysis'
 import { Game } from './ui/Game'
 import { Home } from './ui/Home'
 import { Library } from './ui/Library'
+import { Practice } from './ui/Practice'
 import { Settings } from './ui/Settings'
 import { Stats } from './ui/Stats'
 
-type Screen = 'home' | 'library' | 'game' | 'settings' | 'stats' | 'analysis'
+type Screen =
+  | 'home'
+  | 'library'
+  | 'practice'
+  | 'game'
+  | 'settings'
+  | 'stats'
+  | 'analysis'
 type UpdateApp = (reloadPage?: boolean) => Promise<void>
+
+interface AnalysisSource {
+  game: GameState
+  eventLog: GameEventLog | null
+  replaySettings: ReplaySettings
+  returnTo: 'game' | 'stats'
+}
 
 let audioContext: AudioContext | null = null
 const LIGHT_CHROME_COLOR = '#f6f3ed'
@@ -149,10 +182,18 @@ export function App() {
   const [settings, setSettings] =
     useState<GameSettings>(DEFAULT_SETTINGS)
   const [stats, setStats] = useState<PlayerStats>(EMPTY_STATS)
+  const [archives, setArchives] = useState<ArchivedGameSummary[]>([])
+  const [practiceProgress, setPracticeProgress] =
+    useState<PracticeProgress>(EMPTY_PRACTICE_PROGRESS)
   const [game, setGame] = useState<GameState | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [generationError, setGenerationError] = useState<string | null>(null)
+  const [practiceGenerating, setPracticeGenerating] =
+    useState<LogicalTechnique | null>(null)
+  const [practiceError, setPracticeError] = useState<string | null>(null)
+  const [analysisSource, setAnalysisSource] =
+    useState<AnalysisSource | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [checking, setChecking] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -181,7 +222,16 @@ export function App() {
     let clearsChecking = false
 
     for (const action of actions) {
-      const next = reduceGame(current, action, {
+      const effectiveAction: GameAction =
+        action.type === 'input/digit' &&
+        action.autoRemoveCandidates === undefined
+          ? {
+              ...action,
+              autoRemoveCandidates:
+                settingsRef.current.autoRemoveCandidates,
+            }
+          : action
+      const next = reduceGame(current, effectiveAction, {
         autoRemoveCandidates: settingsRef.current.autoRemoveCandidates,
         errorPolicy: settingsRef.current.errorPolicy,
       })
@@ -189,22 +239,23 @@ export function App() {
 
       changed = true
       current = next
-      if (action.type !== 'clock/tick') {
+      if (effectiveAction.type !== 'clock/tick') {
         persistentChange = true
         if (log !== null) {
           const at =
-            typeof action.at === 'number' && Number.isFinite(action.at)
-              ? action.at
+            typeof effectiveAction.at === 'number' &&
+            Number.isFinite(effectiveAction.at)
+              ? effectiveAction.at
               : Date.now()
-          log = appendGameEvent(log, action, at).log
+          log = appendGameEvent(log, effectiveAction, at).log
         }
       }
       if (
-        action.type === 'input/digit' ||
-        action.type === 'input/color' ||
-        action.type === 'input/erase' ||
-        action.type === 'history/undo' ||
-        action.type === 'history/redo'
+        effectiveAction.type === 'input/digit' ||
+        effectiveAction.type === 'input/color' ||
+        effectiveAction.type === 'input/erase' ||
+        effectiveAction.type === 'history/undo' ||
+        effectiveAction.type === 'history/redo'
       ) {
         clearsChecking = true
       }
@@ -225,8 +276,8 @@ export function App() {
 
   const persistCurrentSession = useCallback(() => {
     const current = gameRef.current
-    if (current === null || !hydratedRef.current) return
-    void saveActiveSession(current, eventLogRef.current)
+    if (current === null || !hydratedRef.current) return null
+    return saveActiveSession(current, eventLogRef.current)
   }, [])
 
   const generateAndStart = useCallback(
@@ -238,6 +289,8 @@ export function App() {
       generationRef.current?.abort()
       const controller = new AbortController()
       generationRef.current = controller
+      setPracticeGenerating(null)
+      setPracticeError(null)
       setGenerating(true)
       setGenerationError(null)
 
@@ -301,14 +354,77 @@ export function App() {
     )
   }, [generateAndStart])
 
+  const startPractice = useCallback(async (technique: LogicalTechnique) => {
+    generationRef.current?.abort()
+    const controller = new AbortController()
+    generationRef.current = controller
+    setGenerating(false)
+    setGenerationError(null)
+    setPracticeGenerating(technique)
+    setPracticeError(null)
+
+    const entropy =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    try {
+      const puzzle = await generatePracticePuzzleInWorker(
+        technique,
+        entropy,
+        { generatedAt: Date.now(), signal: controller.signal },
+      )
+      if (controller.signal.aborted) return
+      const startedAt = Date.now()
+      const nextGame = createGameState(puzzle, {
+        now: startedAt,
+        selectFirstEmpty: true,
+      })
+      const nextLog = createEventLog(puzzle, startedAt, {
+        selectFirstEmpty: true,
+      })
+      recordedCompletionRef.current = null
+      gameRef.current = nextGame
+      eventLogRef.current = nextLog
+      setGame(nextGame)
+      setChecking(false)
+      setMenuOpen(false)
+      setScreen('game')
+      void saveActiveSession(nextGame, nextLog)
+      if ('storage' in navigator && 'persist' in navigator.storage) {
+        void navigator.storage.persist().catch(() => false)
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      setPracticeError(
+        'Não foi possível construir esta prática agora. Tente novamente.',
+      )
+      setScreen('practice')
+    } finally {
+      if (generationRef.current === controller) {
+        generationRef.current = null
+        setPracticeGenerating(null)
+      }
+    }
+  }, [])
+
   useEffect(() => {
     void Promise.all([
       loadActiveSession({ now: Date.now() }),
       loadSettings(),
       loadStats(),
-    ]).then(([session, storedSettings, storedStats]) => {
+      listArchivedGameSummaries(),
+      loadPracticeProgress(),
+    ]).then(([
+      session,
+      storedSettings,
+      storedStats,
+      storedArchives,
+      storedPractice,
+    ]) => {
       setSettings(storedSettings)
       setStats(storedStats)
+      setArchives(storedArchives)
+      setPracticeProgress(storedPractice)
       gameRef.current = session?.state ?? null
       eventLogRef.current = session?.eventLog ?? null
       setGame(session?.state ?? null)
@@ -376,7 +492,18 @@ export function App() {
     if (recordedCompletionRef.current === completionKey) return
     recordedCompletionRef.current = completionKey
 
-    void saveGameCompletion(game).then((result) => setStats(result.stats))
+    void saveGameCompletion(game, {
+      eventLog: eventLogRef.current,
+      replaySettings: replaySettingsFromGameSettings(settingsRef.current),
+    }).then(async (result) => {
+      const [storedArchives, storedPractice] = await Promise.all([
+        listArchivedGameSummaries(),
+        loadPracticeProgress(),
+      ])
+      setStats(result.stats)
+      setArchives(storedArchives)
+      setPracticeProgress(storedPractice)
+    })
   }, [game])
 
   useEffect(() => {
@@ -624,6 +751,93 @@ export function App() {
     })
   }
 
+  const exportAllData = async (): Promise<BackupSummary> => {
+    await persistCurrentSession()
+    const backup = await exportDataBackup()
+    const blob = new Blob([backup.serialized], {
+      type: 'application/json;charset=utf-8',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `absolute-sudoku-${new Date(backup.summary.exportedAt)
+      .toISOString()
+      .slice(0, 10)}.json`
+    document.body.append(link)
+    link.click()
+    link.remove()
+    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    return backup.summary
+  }
+
+  const inspectBackup = (serialized: string): BackupSummary =>
+    parseDataBackup(serialized).summary
+
+  const restoreAllData = async (
+    serialized: string,
+  ): Promise<BackupRestoreResult> => {
+    const result = await restoreDataBackup(serialized)
+    const [session, storedSettings, storedStats, storedArchives, storedPractice] =
+      await Promise.all([
+        loadActiveSession({ now: Date.now() }),
+        loadSettings(),
+        loadStats(),
+        listArchivedGameSummaries(),
+        loadPracticeProgress(),
+      ])
+    settingsRef.current = storedSettings
+    gameRef.current = session?.state ?? null
+    eventLogRef.current = session?.eventLog ?? null
+    recordedCompletionRef.current = null
+    setSettings(storedSettings)
+    setStats(storedStats)
+    setArchives(storedArchives)
+    setPracticeProgress(storedPractice)
+    setGame(session?.state ?? null)
+    setAnalysisSource(null)
+    return result
+  }
+
+  const clearAllData = async (): Promise<void> => {
+    await clearAllStoredData()
+    settingsRef.current = DEFAULT_SETTINGS
+    gameRef.current = null
+    eventLogRef.current = null
+    recordedCompletionRef.current = null
+    setSettings(DEFAULT_SETTINGS)
+    setStats(EMPTY_STATS)
+    setArchives([])
+    setPracticeProgress(EMPTY_PRACTICE_PROGRESS)
+    setGame(null)
+    setAnalysisSource(null)
+    setScreen('home')
+  }
+
+  const openCurrentAnalysis = () => {
+    const current = gameRef.current
+    if (current === null) return
+    setAnalysisSource({
+      game: current,
+      eventLog: eventLogRef.current,
+      replaySettings: replaySettingsFromGameSettings(settingsRef.current),
+      returnTo: 'game',
+    })
+    setScreen('analysis')
+  }
+
+  const openArchivedAnalysis = (id: string) => {
+    void loadArchivedGame(id).then((archived) => {
+      if (archived === null) return
+      setAnalysisSource({
+        game: archived.state,
+        eventLog: archived.eventLog,
+        replaySettings: archived.replaySettings,
+        returnTo: 'stats',
+      })
+      setScreen('analysis')
+    })
+  }
+
   if (loading) return <LoadingScreen />
 
   return (
@@ -653,6 +867,7 @@ export function App() {
             generating={generating}
             error={generationError}
             onBack={() => setScreen('home')}
+            onPractice={() => setScreen('practice')}
             onImport={importValue}
             onStart={(variant, difficulty) =>
               void generateAndStart(
@@ -665,8 +880,23 @@ export function App() {
         </>
       )}
 
+      {screen === 'practice' && (
+        <Practice
+          progress={practiceProgress}
+          generating={practiceGenerating}
+          error={practiceError}
+          onBack={() => setScreen('library')}
+          onStart={(technique) => void startPractice(technique)}
+        />
+      )}
+
       {screen === 'stats' && (
-        <Stats stats={stats} onBack={() => setScreen('home')} />
+        <Stats
+          stats={stats}
+          archives={archives}
+          onBack={() => setScreen('home')}
+          onOpenArchive={openArchivedAnalysis}
+        />
       )}
 
       {screen === 'settings' && (
@@ -674,17 +904,24 @@ export function App() {
           settings={settings}
           onChange={setSettings}
           onBack={closeSettings}
+          onExportData={exportAllData}
+          onInspectBackup={inspectBackup}
+          onRestoreData={restoreAllData}
+          onClearData={clearAllData}
         />
       )}
 
-      {screen === 'analysis' &&
-        game !== null &&
-        eventLogRef.current !== null && (
+      {screen === 'analysis' && analysisSource !== null && (
           <Analysis
-            game={game}
-            eventLog={eventLogRef.current}
+            key={analysisSource.game.puzzle.id}
+            game={analysisSource.game}
+            eventLog={analysisSource.eventLog}
             settings={settings}
-            onBack={() => setScreen('game')}
+            replaySettings={analysisSource.replaySettings}
+            onBack={() => {
+              setScreen(analysisSource.returnTo)
+              setAnalysisSource(null)
+            }}
           />
         )}
 
@@ -733,13 +970,21 @@ export function App() {
           onSettings={() => openSettings('game')}
           onCopy={copyCurrentState}
           copied={copied}
-          onNew={() => setScreen('library')}
-          onHome={goHome}
-          onAnalyze={
-            eventLogRef.current === null
-              ? undefined
-              : () => setScreen('analysis')
+          onNew={() =>
+            setScreen(
+              practiceTechniqueFromPuzzle(game.puzzle) === null
+                ? 'library'
+                : 'practice',
+            )
           }
+          onHome={goHome}
+          contextLabel={(() => {
+            const technique = practiceTechniqueFromPuzzle(game.puzzle)
+            return technique === null
+              ? undefined
+              : `Prática · ${practiceTechniqueDefinition(technique)?.name ?? technique}`
+          })()}
+          onAnalyze={openCurrentAnalysis}
         />
       )}
     </div>

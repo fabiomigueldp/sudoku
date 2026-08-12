@@ -8,6 +8,7 @@ import {
   LOGICAL_TECHNIQUE_RANK,
   type DifficultyAnalysis,
   type DifficultyTechnique,
+  type LogicalTechnique,
 } from './analyzer'
 import { createSeededRandom, hashSeed } from './random'
 import { countSolutions, solve } from './solver'
@@ -76,6 +77,8 @@ export interface GeneratePuzzleOptions {
    * that persist an ad-hoc generation time can provide it explicitly.
    */
   generatedAt?: number
+  /** Restricts practice generation to paths containing a named technique. */
+  targetTechnique?: LogicalTechnique
 }
 
 export interface GeneratorRequest {
@@ -84,6 +87,7 @@ export interface GeneratorRequest {
   variant: VariantId
   difficulty: DifficultyId
   generatedAt?: number
+  targetTechnique?: LogicalTechnique
 }
 
 export interface GeneratorSuccess {
@@ -130,8 +134,11 @@ function difficultyTechniqueRank(technique: DifficultyTechnique): number {
 function candidatePenalty(
   candidate: RatedCandidate,
   difficulty: DifficultyId,
+  targetTechnique?: LogicalTechnique,
 ): number {
-  const desiredRank = DIFFICULTY_PROFILES[difficulty].targetRank
+  const desiredRank = targetTechnique === undefined
+    ? DIFFICULTY_PROFILES[difficulty].targetRank
+    : LOGICAL_TECHNIQUE_RANK[targetTechnique]
   const actualRank = candidate.analysis.solvedLogically
     ? difficultyTechniqueRank(candidate.analysis.hardestTechnique)
     : 99
@@ -160,12 +167,17 @@ function candidatePenalty(
 function candidateMatchesProfile(
   candidate: RatedCandidate,
   difficulty: DifficultyId,
+  targetTechnique?: LogicalTechnique,
 ): boolean {
   if (!candidate.analysis.solvedLogically) return false
   const profile = DIFFICULTY_PROFILES[difficulty]
   const rank = difficultyTechniqueRank(candidate.analysis.hardestTechnique)
   const clues = clueCount(candidate.givens)
   return (
+    (targetTechnique === undefined ||
+      candidate.analysis.steps.some(
+        (step) => step.technique === targetTechnique,
+      )) &&
     rank >= profile.rankRange[0] &&
     rank <= profile.rankRange[1] &&
     clues >= profile.clueRange[0] &&
@@ -213,6 +225,7 @@ function carveRatedPuzzle(
   difficulty: DifficultyId,
   random: ReturnType<typeof createSeededRandom>,
   attempt: number,
+  targetTechnique?: LogicalTechnique,
 ): RatedCandidate | null {
   const profile = DIFFICULTY_PROFILES[difficulty]
   const givens = [...solution]
@@ -258,10 +271,10 @@ function carveRatedPuzzle(
       attempt,
     }
     if (
-      candidateMatchesProfile(candidate, difficulty) &&
+      candidateMatchesProfile(candidate, difficulty, targetTechnique) &&
       (best === null ||
-        candidatePenalty(candidate, difficulty) <
-          candidatePenalty(best, difficulty))
+        candidatePenalty(candidate, difficulty, targetTechnique) <
+          candidatePenalty(best, difficulty, targetTechnique))
     ) {
       best = candidate
     }
@@ -277,11 +290,19 @@ function carveRatedPuzzle(
   return best
 }
 
+interface NormalizedGeneratePuzzleOptions {
+  seed: string
+  variant: VariantId
+  difficulty: DifficultyId
+  generatedAt: number
+  targetTechnique?: LogicalTechnique
+}
+
 function normalizeOptions(
   seedOrOptions: string | GeneratePuzzleOptions,
   variant: VariantId,
   difficulty: DifficultyId,
-): Required<GeneratePuzzleOptions> {
+): NormalizedGeneratePuzzleOptions {
   if (typeof seedOrOptions === 'string') {
     return {
       seed: seedOrOptions,
@@ -296,6 +317,9 @@ function normalizeOptions(
     variant: seedOrOptions.variant ?? 'classic',
     difficulty: seedOrOptions.difficulty ?? 'focused',
     generatedAt: seedOrOptions.generatedAt ?? 0,
+    ...(seedOrOptions.targetTechnique === undefined
+      ? {}
+      : { targetTechnique: seedOrOptions.targetTechnique }),
   }
 }
 
@@ -322,7 +346,10 @@ export function generatePuzzle(
   let preferredCandidates = 0
 
   const profile = DIFFICULTY_PROFILES[options.difficulty]
-  for (let attempt = 0; attempt < profile.attempts; attempt += 1) {
+  const attemptLimit = options.targetTechnique === undefined
+    ? profile.attempts
+    : profile.attempts * 2
+  for (let attempt = 0; attempt < attemptLimit; attempt += 1) {
     const random = createSeededRandom(
       `absolute-sudoku:generation:v${GENERATOR_VERSION}:${options.seed}:${options.variant}:${options.difficulty}:${attempt}`,
     )
@@ -338,33 +365,57 @@ export function generatePuzzle(
       options.difficulty,
       random,
       attempt,
+      options.targetTechnique,
     )
     if (candidate === null) continue
     const candidateRank = difficultyTechniqueRank(
       candidate.analysis.hardestTechnique,
     )
-    if (candidateRank >= profile.targetRank) preferredCandidates += 1
+    if (
+      options.targetTechnique === undefined
+        ? candidateRank >= profile.targetRank
+        : candidate.analysis.steps.some(
+            (step) => step.technique === options.targetTechnique,
+          )
+    ) {
+      preferredCandidates += 1
+    }
 
     if (
       bestCandidate === null ||
-      candidatePenalty(candidate, options.difficulty) <
-        candidatePenalty(bestCandidate, options.difficulty)
+        candidatePenalty(
+          candidate,
+          options.difficulty,
+          options.targetTechnique,
+        ) <
+        candidatePenalty(
+          bestCandidate,
+          options.difficulty,
+          options.targetTechnique,
+        )
     ) {
       bestCandidate = candidate
     }
 
-    if (preferredCandidates >= 2) break
+    if (
+      preferredCandidates >=
+      (options.targetTechnique === undefined ? 2 : 1)
+    ) {
+      break
+    }
   }
 
   if (bestCandidate === null) {
     throw new Error(
-      `Unable to generate a logically rated ${options.difficulty} ${options.variant} Sudoku`,
+      `Unable to generate a logically rated ${options.targetTechnique ?? options.difficulty} ${options.variant} Sudoku`,
     )
   }
 
-  const fingerprint = hashSeed(
-    `${options.seed}|${options.variant}|${options.difficulty}|v${GENERATOR_VERSION}`,
-  )
+  const fingerprintSource =
+    options.targetTechnique === undefined
+      ? `${options.seed}|${options.variant}|${options.difficulty}|v${GENERATOR_VERSION}`
+      : `${options.seed}|${options.variant}|${options.difficulty}|${options.targetTechnique}|v${GENERATOR_VERSION}`
+  const fingerprint = hashSeed(fingerprintSource)
     .toString(16)
     .padStart(8, '0')
 

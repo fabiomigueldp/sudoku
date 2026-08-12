@@ -14,6 +14,7 @@ interface GameHeaderProps {
   elapsedMs: number
   showTimer: boolean
   status: GameStatus
+  contextLabel?: string | undefined
   onBack: () => void
   onPause: () => void
   onMore: () => void
@@ -25,6 +26,7 @@ export function GameHeader({
   elapsedMs,
   showTimer,
   status,
+  contextLabel,
   onBack,
   onPause,
   onMore,
@@ -41,8 +43,14 @@ export function GameHeader({
         <span className="sr-only">Voltar ao início</span>
       </button>
       <div className="game-identity">
-        <strong>{variantName}</strong>
-        <span>{difficultyName}</span>
+        {contextLabel ? (
+          <strong>{contextLabel}</strong>
+        ) : (
+          <>
+            <strong>{variantName}</strong>
+            <span>{difficultyName}</span>
+          </>
+        )}
       </div>
       <div className="game-header-actions">
         <button

@@ -22,6 +22,9 @@ workerScope.addEventListener('message', (event: MessageEvent<GeneratorRequest>) 
     if (request.generatedAt !== undefined) {
       options.generatedAt = request.generatedAt
     }
+    if (request.targetTechnique !== undefined) {
+      options.targetTechnique = request.targetTechnique
+    }
 
     const response: GeneratorResponse = {
       id: request.id,
