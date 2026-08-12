@@ -3,6 +3,11 @@
 Um Sudoku local-first, preciso e acessível. A aplicação não depende de conta,
 backend ou conexão depois da primeira carga.
 
+## Acesso online
+
+A versão publicada do projeto está disponível em
+[sudoku-zeta-rosy.vercel.app](https://sudoku-zeta-rosy.vercel.app/).
+
 ## Versionamento
 
 A versão atual é `0.2.0`. O histórico técnico por versão está em
