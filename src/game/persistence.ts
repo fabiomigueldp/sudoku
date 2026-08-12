@@ -102,6 +102,16 @@ const fallbackMemory: FallbackMemory = {
 
 let databasePromise: Promise<IDBPDatabase<AbsoluteSudokuDatabase> | null> | null =
   null
+let sessionWriteQueue: Promise<void> = Promise.resolve()
+
+function enqueueSessionWrite<T>(work: () => Promise<T>): Promise<T> {
+  const result = sessionWriteQueue.then(work, work)
+  sessionWriteQueue = result.then(
+    () => undefined,
+    () => undefined,
+  )
+  return result
+}
 
 function cloneJson<T>(value: T): T {
   if (typeof structuredClone === 'function') return structuredClone(value)
@@ -512,7 +522,7 @@ async function readDatabaseStore(
   }
 }
 
-export async function saveActiveSession(
+export function saveActiveSession(
   state: GameState,
   eventLog: GameEventLog | null = null,
   savedAt = Date.now(),
@@ -523,16 +533,20 @@ export async function saveActiveSession(
     state: cloneJson(state),
     eventLog: eventLog === null ? null : cloneJson(eventLog),
   }
-  writeFallback('session', FALLBACK_KEYS.session, session)
+  return enqueueSessionWrite(async () => {
+    try {
+      const db = await database()
+      if (db !== null) {
+        await db.put('sessions', session, ACTIVE_SESSION_KEY)
+        return { backend: 'indexeddb' }
+      }
+    } catch {
+      // A compact fallback is written below only when IndexedDB is unavailable.
+    }
 
-  try {
-    const db = await database()
-    if (db === null) return { backend: 'fallback' }
-    await db.put('sessions', session, ACTIVE_SESSION_KEY)
-    return { backend: 'indexeddb' }
-  } catch {
+    writeFallback('session', FALLBACK_KEYS.session, session)
     return { backend: 'fallback' }
-  }
+  })
 }
 
 export async function loadActiveSession(
@@ -553,16 +567,18 @@ export async function loadActiveSession(
   return session
 }
 
-export async function clearActiveSession(): Promise<StorageWriteResult> {
-  writeFallback('session', FALLBACK_KEYS.session, null)
-  try {
-    const db = await database()
-    if (db === null) return { backend: 'fallback' }
-    await db.delete('sessions', ACTIVE_SESSION_KEY)
-    return { backend: 'indexeddb' }
-  } catch {
-    return { backend: 'fallback' }
-  }
+export function clearActiveSession(): Promise<StorageWriteResult> {
+  return enqueueSessionWrite(async () => {
+    writeFallback('session', FALLBACK_KEYS.session, null)
+    try {
+      const db = await database()
+      if (db === null) return { backend: 'fallback' }
+      await db.delete('sessions', ACTIVE_SESSION_KEY)
+      return { backend: 'indexeddb' }
+    } catch {
+      return { backend: 'fallback' }
+    }
+  })
 }
 
 export async function saveSettings(
@@ -672,4 +688,5 @@ export function resetFallbackStorageForTests(): void {
   }
   void databasePromise?.then((db) => db?.close())
   databasePromise = null
+  sessionWriteQueue = Promise.resolve()
 }

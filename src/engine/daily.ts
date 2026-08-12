@@ -1,4 +1,5 @@
 import type { DifficultyId, VariantId } from '../domain/types'
+import { GENERATOR_VERSION } from './generator'
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0')
@@ -45,5 +46,5 @@ export function dailySeed(
   variant: VariantId = 'classic',
   difficulty: DifficultyId = 'focused',
 ): string {
-  return `absolute-sudoku:daily:v1:${normalizeDateKey(date)}:${variant}:${difficulty}`
+  return `absolute-sudoku:daily:v2:g${GENERATOR_VERSION}:${normalizeDateKey(date)}:${variant}:${difficulty}`
 }

@@ -18,6 +18,7 @@ interface BoardProps {
   conflicts: ReadonlySet<number>
   peers: ReadonlySet<number>
   hint: HintStep | null
+  readOnly?: boolean
   onSelect: (index: number, additive: boolean, range: boolean) => void
   onDragSelect: (index: number) => void
   onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void
@@ -52,6 +53,7 @@ const Cell = memo(function Cell({
   conflict,
   hinted,
   diagonal,
+  readOnly,
   onSelect,
   onDragSelect,
   onKeyDown,
@@ -65,6 +67,7 @@ const Cell = memo(function Cell({
   conflict: boolean
   hinted: boolean
   diagonal: boolean
+  readOnly: boolean
   onSelect: BoardProps['onSelect']
   onDragSelect: BoardProps['onDragSelect']
   onKeyDown: BoardProps['onKeyDown']
@@ -93,6 +96,7 @@ const Cell = memo(function Cell({
       data-hint={hinted || undefined}
       data-diagonal={diagonal || undefined}
       data-color={cell.color ?? undefined}
+      data-readonly={readOnly || undefined}
       data-notes={
         cell.corner.length > 0 && cell.center.length > 0
           ? 'mixed'
@@ -107,18 +111,25 @@ const Cell = memo(function Cell({
       aria-invalid={conflict || undefined}
       aria-rowindex={Math.floor(index / 9) + 1}
       aria-colindex={(index % 9) + 1}
-      tabIndex={isAnchor ? 0 : -1}
-      onClick={(event) =>
-        onSelect(
-          index,
-          event.ctrlKey || event.metaKey,
-          event.shiftKey,
-        )
+      tabIndex={!readOnly && isAnchor ? 0 : -1}
+      onClick={
+        readOnly
+          ? undefined
+          : (event) =>
+              onSelect(
+                index,
+                event.ctrlKey || event.metaKey,
+                event.shiftKey,
+              )
       }
-      onPointerEnter={(event) => {
-        if (event.buttons === 1) onDragSelect(index)
-      }}
-      onKeyDown={onKeyDown}
+      onPointerEnter={
+        readOnly
+          ? undefined
+          : (event) => {
+              if (event.buttons === 1) onDragSelect(index)
+            }
+      }
+      onKeyDown={readOnly ? undefined : onKeyDown}
     >
       {cell.value ? (
         <span className="cell-value">{cell.value}</span>
@@ -159,6 +170,7 @@ export function Board({
   conflicts,
   peers,
   hint,
+  readOnly = false,
   onSelect,
   onDragSelect,
   onKeyDown,
@@ -173,7 +185,13 @@ export function Board({
       data-variant={puzzle.variant}
       aria-label={`Sudoku ${puzzle.variant}, dificuldade ${puzzle.difficulty}`}
     >
-      <div className="sudoku-board" role="grid" aria-rowcount={9} aria-colcount={9}>
+      <div
+        className="sudoku-board"
+        role="grid"
+        aria-readonly={readOnly || undefined}
+        aria-rowcount={9}
+        aria-colcount={9}
+      >
         {Array.from({ length: 9 }, (_, row) => (
           <div role="row" className="board-row" key={row}>
             {cells.slice(row * 9, row * 9 + 9).map((cell, column) => {
@@ -201,6 +219,7 @@ export function Board({
                   conflict={conflicts.has(index)}
                   hinted={hinted.has(index)}
                   diagonal={isDiagonal}
+                  readOnly={readOnly}
                   onSelect={onSelect}
                   onDragSelect={onDragSelect}
                   onKeyDown={onKeyDown}

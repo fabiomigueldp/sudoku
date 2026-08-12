@@ -51,6 +51,7 @@ export {
 
 export {
   DIFFICULTY_PROFILES,
+  GENERATOR_VERSION,
   generatePuzzle,
   type DifficultyProfile,
   type GeneratePuzzleOptions,

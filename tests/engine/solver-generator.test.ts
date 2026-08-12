@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 import {
   analyzeDifficulty,
   countSolutions,
+  DIFFICULTY_PROFILES,
   generatePuzzle,
   hasUniqueSolution,
   isSolved,
+  LOGICAL_TECHNIQUE_RANK,
   solve,
 } from '../../src/engine'
 import type { DifficultyId, VariantId } from '../../src/domain/types'
@@ -89,13 +91,40 @@ describe('deterministic unique generator', () => {
       'expert',
       'master',
     ]
-    const counts = difficulties.map((difficulty) =>
-      numberOfClues(generatePuzzle('difficulty-profile', 'classic', difficulty).givens),
+    const puzzles = difficulties.map((difficulty) =>
+      generatePuzzle('difficulty-profile', 'classic', difficulty),
     )
+    const counts = puzzles.map((puzzle) => numberOfClues(puzzle.givens))
 
     expect(counts).toEqual([...counts].sort((left, right) => right - left))
     expect(counts[0]).toBeGreaterThan(counts.at(-1) as number)
-  })
+
+    puzzles.forEach((puzzle, index) => {
+      const difficulty = difficulties[index] as DifficultyId
+      const analysis = analyzeDifficulty(puzzle.givens, 'classic')
+      const technique = analysis.hardestTechnique
+      const rank =
+        technique === 'none' ||
+        technique === 'invalid' ||
+        technique === 'search-required'
+          ? -1
+          : LOGICAL_TECHNIQUE_RANK[technique]
+
+      expect(analysis.solvedLogically).toBe(true)
+      expect(rank).toBeGreaterThanOrEqual(
+        DIFFICULTY_PROFILES[difficulty].rankRange[0],
+      )
+      expect(rank).toBeLessThanOrEqual(
+        DIFFICULTY_PROFILES[difficulty].rankRange[1],
+      )
+      expect(
+        puzzle.givens.every(
+          (value, cell) =>
+            (value === 0) === (puzzle.givens[80 - cell] === 0),
+        ),
+      ).toBe(true)
+    })
+  }, 20_000)
 
   it('uses the measured human solve path, not a generic density label', () => {
     const relaxed = generatePuzzle('human-rating', 'classic', 'relaxed')

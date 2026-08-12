@@ -20,7 +20,16 @@ export type LogicalTechnique =
   | 'locked-candidates-pointing'
   | 'locked-candidates-claiming'
   | 'naked-pair'
+  | 'hidden-pair'
+  | 'naked-triple'
+  | 'hidden-triple'
+  | 'naked-quad'
+  | 'hidden-quad'
   | 'x-wing'
+  | 'skyscraper'
+  | 'swordfish'
+  | 'xy-wing'
+  | 'jellyfish'
 
 export type DifficultyTechnique =
   | LogicalTechnique
@@ -91,7 +100,16 @@ const TECHNIQUE_SCORE: Readonly<Record<LogicalTechnique, number>> = {
   'locked-candidates-pointing': 6,
   'locked-candidates-claiming': 7,
   'naked-pair': 10,
+  'hidden-pair': 11,
+  'naked-triple': 14,
+  'hidden-triple': 15,
+  'naked-quad': 17,
+  'hidden-quad': 18,
   'x-wing': 18,
+  skyscraper: 22,
+  swordfish: 28,
+  'xy-wing': 30,
+  jellyfish: 40,
 }
 
 export const LOGICAL_TECHNIQUE_RANK: Readonly<
@@ -102,7 +120,16 @@ export const LOGICAL_TECHNIQUE_RANK: Readonly<
   'locked-candidates-pointing': 3,
   'locked-candidates-claiming': 3,
   'naked-pair': 4,
-  'x-wing': 5,
+  'hidden-pair': 4,
+  'naked-triple': 5,
+  'hidden-triple': 5,
+  'naked-quad': 5,
+  'hidden-quad': 5,
+  'x-wing': 6,
+  skyscraper: 6,
+  swordfish: 7,
+  'xy-wing': 7,
+  jellyfish: 8,
 }
 
 function digitMask(digit: Digit): number {
@@ -131,6 +158,20 @@ function singleDigit(mask: number): Digit {
 
 function uniqueSorted(values: readonly number[]): number[] {
   return [...new Set(values)].sort((left, right) => left - right)
+}
+
+function combinations<T>(values: readonly T[], size: number): T[][] {
+  if (size === 0) return [[]]
+  if (values.length < size) return []
+
+  const result: T[][] = []
+  for (let index = 0; index <= values.length - size; index += 1) {
+    const head = values[index] as T
+    for (const tail of combinations(values.slice(index + 1), size - 1)) {
+      result.push([head, ...tail])
+    }
+  }
+  return result
 }
 
 function createState(grid: readonly number[], variant: VariantId): LogicalState {
@@ -402,6 +443,96 @@ function findNakedPair(
   return null
 }
 
+function findNakedSubset(
+  state: LogicalState,
+  variant: VariantId,
+  size: 3 | 4,
+  technique: 'naked-triple' | 'naked-quad',
+): StepDraft | null {
+  for (const unit of unitsFor(variant)) {
+    const candidates = unit.filter((cell) => {
+      const count = countBits(state.masks[cell] as number)
+      return state.grid[cell] === 0 && count >= 2 && count <= size
+    })
+
+    for (const pattern of combinations(candidates, size)) {
+      const unionMask = pattern.reduce(
+        (mask, cell) => mask | (state.masks[cell] as number),
+        0,
+      )
+      if (countBits(unionMask) !== size) continue
+
+      const affected = unit.filter(
+        (cell) =>
+          state.grid[cell] === 0 &&
+          !pattern.includes(cell) &&
+          ((state.masks[cell] as number) & unionMask) !== 0,
+      )
+      if (affected.length === 0) continue
+
+      return makeEliminationStep(
+        state,
+        technique,
+        digitsFromMask(unionMask),
+        pattern,
+        affected,
+        [unit],
+      )
+    }
+  }
+
+  return null
+}
+
+function findHiddenSubset(
+  state: LogicalState,
+  variant: VariantId,
+  size: 2 | 3 | 4,
+  technique: 'hidden-pair' | 'hidden-triple' | 'hidden-quad',
+): StepDraft | null {
+  for (const unit of unitsFor(variant)) {
+    for (const digits of combinations(ALL_DIGITS, size)) {
+      const subsetMask = digits.reduce(
+        (mask, digit) => mask | digitMask(digit),
+        0,
+      )
+      const pattern = unit.filter(
+        (cell) =>
+          state.grid[cell] === 0 &&
+          ((state.masks[cell] as number) & subsetMask) !== 0,
+      )
+      if (pattern.length !== size) continue
+      if (
+        !digits.every((digit) =>
+          pattern.some(
+            (cell) =>
+              ((state.masks[cell] as number) & digitMask(digit)) !== 0,
+          ),
+        )
+      ) {
+        continue
+      }
+
+      const eliminations = pattern.flatMap((cell) => {
+        const extras = (state.masks[cell] as number) & ~subsetMask
+        return extras === 0
+          ? []
+          : [{ cell, digits: digitsFromMask(extras) }]
+      })
+      if (eliminations.length === 0) continue
+
+      return {
+        technique,
+        cells: uniqueSorted(pattern),
+        units: [[...unit]],
+        eliminations,
+      }
+    }
+  }
+
+  return null
+}
+
 function findXWingByRows(
   state: LogicalState,
   digit: Digit,
@@ -509,6 +640,251 @@ function findXWing(state: LogicalState): StepDraft | null {
   return null
 }
 
+function findFishByOrientation(
+  state: LogicalState,
+  digit: Digit,
+  size: 3 | 4,
+  technique: 'swordfish' | 'jellyfish',
+  orientation: 'rows' | 'columns',
+): StepDraft | null {
+  const baseUnit = orientation === 'rows' ? rowCells : columnCells
+  const coverIndex = orientation === 'rows' ? columnOf : rowOf
+  const coverUnit = orientation === 'rows' ? columnCells : rowCells
+  const baseIndex = orientation === 'rows' ? rowOf : columnOf
+  const eligible = Array.from({ length: 9 }, (_, index) => index).filter(
+    (index) => {
+      const count = cellsWithDigit(state, baseUnit(index), digit).length
+      return count >= 2 && count <= size
+    },
+  )
+
+  for (const baseLines of combinations(eligible, size)) {
+    const coverLines = uniqueSorted(
+      baseLines.flatMap((line) =>
+        cellsWithDigit(state, baseUnit(line), digit).map(coverIndex),
+      ),
+    )
+    if (coverLines.length !== size) continue
+
+    const affected = uniqueSorted(
+      coverLines.flatMap((line) =>
+        cellsWithDigit(state, coverUnit(line), digit).filter(
+          (cell) => !baseLines.includes(baseIndex(cell)),
+        ),
+      ),
+    )
+    if (affected.length === 0) continue
+
+    const pattern = baseLines.flatMap((line) =>
+      cellsWithDigit(state, baseUnit(line), digit),
+    )
+    return makeEliminationStep(
+      state,
+      technique,
+      [digit],
+      pattern,
+      affected,
+      [
+        ...baseLines.map(baseUnit),
+        ...coverLines.map(coverUnit),
+      ],
+    )
+  }
+
+  return null
+}
+
+function findFish(
+  state: LogicalState,
+  size: 3 | 4,
+  technique: 'swordfish' | 'jellyfish',
+): StepDraft | null {
+  for (const digit of ALL_DIGITS) {
+    const byRows = findFishByOrientation(
+      state,
+      digit,
+      size,
+      technique,
+      'rows',
+    )
+    if (byRows !== null) return byRows
+
+    const byColumns = findFishByOrientation(
+      state,
+      digit,
+      size,
+      technique,
+      'columns',
+    )
+    if (byColumns !== null) return byColumns
+  }
+  return null
+}
+
+function commonCandidatePeers(
+  state: LogicalState,
+  first: number,
+  second: number,
+  digit: Digit,
+  excluded: readonly number[],
+  variant: VariantId,
+): number[] {
+  const secondPeers = new Set(peerView(second, variant))
+  const bit = digitMask(digit)
+  return peerView(first, variant).filter(
+    (cell) =>
+      secondPeers.has(cell) &&
+      !excluded.includes(cell) &&
+      state.grid[cell] === 0 &&
+      ((state.masks[cell] as number) & bit) !== 0,
+  )
+}
+
+function findSkyscraperByOrientation(
+  state: LogicalState,
+  digit: Digit,
+  variant: VariantId,
+  orientation: 'rows' | 'columns',
+): StepDraft | null {
+  const unitFor = orientation === 'rows' ? rowCells : columnCells
+  const crossIndex = orientation === 'rows' ? columnOf : rowOf
+  const strongLinks = Array.from({ length: 9 }, (_, index) => ({
+    index,
+    cells: cellsWithDigit(state, unitFor(index), digit),
+  })).filter((entry) => entry.cells.length === 2)
+
+  for (const [first, second] of combinations(strongLinks, 2)) {
+    if (first === undefined || second === undefined) continue
+    const shared = first.cells.filter((firstCell) =>
+      second.cells.some(
+        (secondCell) => crossIndex(secondCell) === crossIndex(firstCell),
+      ),
+    )
+    if (shared.length !== 1) continue
+
+    const sharedCross = crossIndex(shared[0] as number)
+    const firstRoof = first.cells.find(
+      (cell) => crossIndex(cell) !== sharedCross,
+    )
+    const secondRoof = second.cells.find(
+      (cell) => crossIndex(cell) !== sharedCross,
+    )
+    if (firstRoof === undefined || secondRoof === undefined) continue
+
+    const pattern = [...first.cells, ...second.cells]
+    const affected = commonCandidatePeers(
+      state,
+      firstRoof,
+      secondRoof,
+      digit,
+      pattern,
+      variant,
+    )
+    if (affected.length === 0) continue
+
+    return makeEliminationStep(
+      state,
+      'skyscraper',
+      [digit],
+      pattern,
+      affected,
+      [unitFor(first.index), unitFor(second.index)],
+    )
+  }
+
+  return null
+}
+
+function findSkyscraper(
+  state: LogicalState,
+  variant: VariantId,
+): StepDraft | null {
+  for (const digit of ALL_DIGITS) {
+    const byRows = findSkyscraperByOrientation(
+      state,
+      digit,
+      variant,
+      'rows',
+    )
+    if (byRows !== null) return byRows
+    const byColumns = findSkyscraperByOrientation(
+      state,
+      digit,
+      variant,
+      'columns',
+    )
+    if (byColumns !== null) return byColumns
+  }
+  return null
+}
+
+function findXYWing(
+  state: LogicalState,
+  variant: VariantId,
+): StepDraft | null {
+  const bivalueCells = Array.from({ length: CELL_COUNT }, (_, cell) => cell)
+    .filter(
+      (cell) =>
+        state.grid[cell] === 0 &&
+        countBits(state.masks[cell] as number) === 2,
+    )
+
+  for (const pivot of bivalueCells) {
+    const pivotMask = state.masks[pivot] as number
+    const pivotPeers = new Set(peerView(pivot, variant))
+    const wings = bivalueCells.filter(
+      (cell) => cell !== pivot && pivotPeers.has(cell),
+    )
+
+    for (const [firstWing, secondWing] of combinations(wings, 2)) {
+      if (firstWing === undefined || secondWing === undefined) continue
+      const firstMask = state.masks[firstWing] as number
+      const secondMask = state.masks[secondWing] as number
+      const firstPivotDigit = firstMask & pivotMask
+      const secondPivotDigit = secondMask & pivotMask
+      if (
+        countBits(firstPivotDigit) !== 1 ||
+        countBits(secondPivotDigit) !== 1 ||
+        firstPivotDigit === secondPivotDigit
+      ) {
+        continue
+      }
+
+      const firstOuter = firstMask & ~pivotMask
+      const secondOuter = secondMask & ~pivotMask
+      if (
+        countBits(firstOuter) !== 1 ||
+        firstOuter !== secondOuter
+      ) {
+        continue
+      }
+
+      const digit = singleDigit(firstOuter)
+      const pattern = [pivot, firstWing, secondWing]
+      const affected = commonCandidatePeers(
+        state,
+        firstWing,
+        secondWing,
+        digit,
+        pattern,
+        variant,
+      )
+      if (affected.length === 0) continue
+
+      return makeEliminationStep(
+        state,
+        'xy-wing',
+        [digit],
+        pattern,
+        affected,
+        [],
+      )
+    }
+  }
+
+  return null
+}
+
 function nextStep(
   state: LogicalState,
   variant: VariantId,
@@ -519,7 +895,16 @@ function nextStep(
     findPointing(state) ??
     findClaiming(state) ??
     findNakedPair(state, variant) ??
-    findXWing(state)
+    findHiddenSubset(state, variant, 2, 'hidden-pair') ??
+    findNakedSubset(state, variant, 3, 'naked-triple') ??
+    findHiddenSubset(state, variant, 3, 'hidden-triple') ??
+    findNakedSubset(state, variant, 4, 'naked-quad') ??
+    findHiddenSubset(state, variant, 4, 'hidden-quad') ??
+    findXWing(state) ??
+    findSkyscraper(state, variant) ??
+    findFish(state, 3, 'swordfish') ??
+    findXYWing(state, variant) ??
+    findFish(state, 4, 'jellyfish')
   )
 }
 

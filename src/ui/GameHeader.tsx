@@ -45,21 +45,25 @@ export function GameHeader({
         <span>{difficultyName}</span>
       </div>
       <div className="game-header-actions">
-        {showTimer && (
-          <button
-            type="button"
-            className="timer-button"
-            onClick={onPause}
-            aria-label={
-              status === 'paused'
+        <button
+          type="button"
+          className={showTimer ? 'timer-button' : 'icon-button'}
+          onClick={onPause}
+          aria-label={
+            showTimer
+              ? status === 'paused'
                 ? `Continuar, tempo ${formatTime(elapsedMs)}`
                 : `Pausar, tempo ${formatTime(elapsedMs)}`
-            }
-          >
+              : status === 'paused'
+                ? 'Continuar partida'
+                : 'Pausar partida'
+          }
+        >
+          {showTimer && (
             <span aria-hidden="true">{formatTime(elapsedMs)}</span>
-            {status === 'paused' ? <PlayIcon /> : <PauseIcon />}
-          </button>
-        )}
+          )}
+          {status === 'paused' ? <PlayIcon /> : <PauseIcon />}
+        </button>
         <button type="button" className="icon-button" onClick={onMore}>
           <MoreIcon />
           <span className="sr-only">Opções da partida</span>

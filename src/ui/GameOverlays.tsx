@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type RefObject } from 'react'
 import type { GameState, HintStep } from '../domain/types'
 import { VARIANTS } from '../domain/catalog'
 import {
@@ -20,6 +20,81 @@ const FOCUSABLE_SELECTOR = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(',')
 
+function useModalDialog<T extends HTMLElement>(
+  layerRef: RefObject<HTMLElement | null>,
+  initialFocusRef: RefObject<T | null>,
+  onDismiss: () => void,
+) {
+  const onDismissRef = useRef(onDismiss)
+
+  useEffect(() => {
+    onDismissRef.current = onDismiss
+  }, [onDismiss])
+
+  useEffect(() => {
+    const layer = layerRef.current
+    if (layer === null) return
+    const previousFocus =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null
+    const siblings = Array.from(layer.parentElement?.children ?? [])
+      .filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && element !== layer,
+      )
+      .map((element) => ({ element, inert: element.inert }))
+
+    for (const { element } of siblings) element.inert = true
+    const frame = window.requestAnimationFrame(() => {
+      initialFocusRef.current?.focus({ preventScroll: true })
+    })
+
+    return () => {
+      window.cancelAnimationFrame(frame)
+      for (const { element, inert } of siblings) element.inert = inert
+      if (previousFocus?.isConnected) {
+        previousFocus.focus({ preventScroll: true })
+      }
+    }
+  }, [initialFocusRef, layerRef])
+
+  return (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault()
+      event.stopPropagation()
+      onDismissRef.current()
+      return
+    }
+    if (event.key !== 'Tab') return
+
+    const layer = layerRef.current
+    if (layer === null) return
+    const focusable = Array.from(
+      layer.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ).filter((element) => element.getClientRects().length > 0)
+    const first = focusable[0]
+    const last = focusable.at(-1)
+    if (first === undefined || last === undefined) {
+      event.preventDefault()
+      layer.focus()
+      return
+    }
+
+    const active = document.activeElement
+    if (event.shiftKey && (active === first || !layer.contains(active))) {
+      event.preventDefault()
+      last.focus()
+    } else if (
+      !event.shiftKey &&
+      (active === last || !layer.contains(active))
+    ) {
+      event.preventDefault()
+      first.focus()
+    }
+  }
+}
+
 export function PauseOverlay({
   elapsedMs,
   onResume,
@@ -29,16 +104,33 @@ export function PauseOverlay({
   onResume: () => void
   onExit: () => void
 }) {
+  const layerRef = useRef<HTMLElement>(null)
+  const resumeRef = useRef<HTMLButtonElement>(null)
+  const handleKeyDown = useModalDialog(layerRef, resumeRef, onResume)
+
   return (
-    <section className="pause-overlay" aria-label="Partida pausada">
+    <section
+      ref={layerRef}
+      className="pause-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="pause-title"
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+    >
       <div className="pause-mark" aria-hidden="true">
         <span />
         <span />
       </div>
-      <p>Pausado</p>
+      <p id="pause-title">Pausado</p>
       <strong>{formatTime(elapsedMs)}</strong>
       <div>
-        <button type="button" className="primary-action" onClick={onResume}>
+        <button
+          ref={resumeRef}
+          type="button"
+          className="primary-action"
+          onClick={onResume}
+        >
           <PlayIcon />
           Continuar
         </button>
@@ -62,6 +154,19 @@ export function HintPanel({
   const techniqueNames: Record<string, string> = {
     'naked-single': 'Single direto',
     'hidden-single': 'Single oculto',
+    'locked-candidates-pointing': 'Candidatos apontados',
+    'locked-candidates-claiming': 'Candidatos confinados',
+    'naked-pair': 'Par nu',
+    'hidden-pair': 'Par oculto',
+    'naked-triple': 'Trinca nua',
+    'hidden-triple': 'Trinca oculta',
+    'naked-quad': 'Quarteto nu',
+    'hidden-quad': 'Quarteto oculto',
+    'x-wing': 'X-Wing',
+    skyscraper: 'Skyscraper',
+    swordfish: 'Swordfish',
+    'xy-wing': 'XY-Wing',
+    jellyfish: 'Jellyfish',
     'forcing-choice': 'Teste por contradição',
     conflict: 'Conflito lógico',
     'incorrect-value': 'Revisão necessária',
@@ -247,17 +352,33 @@ export function CompletionOverlay({
   game,
   onHome,
   onAgain,
+  onAnalyze,
 }: {
   game: GameState
   onHome: () => void
   onAgain: () => void
+  onAnalyze?: (() => void) | undefined
 }) {
+  const layerRef = useRef<HTMLElement>(null)
+  const announcementRef = useRef<HTMLParagraphElement>(null)
+  const handleKeyDown = useModalDialog(layerRef, announcementRef, onHome)
+
   return (
-    <section className="completion-overlay" aria-live="polite">
+    <section
+      ref={layerRef}
+      className="completion-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="completion-title"
+      tabIndex={-1}
+      onKeyDown={handleKeyDown}
+    >
       <div className="completion-check" aria-hidden="true">
         <CheckIcon />
       </div>
-      <p>Grade concluída</p>
+      <p ref={announcementRef} id="completion-title" tabIndex={-1}>
+        Grade concluída
+      </p>
       <h2>
         {VARIANTS.find((item) => item.id === game.puzzle.variant)?.name}
       </h2>
@@ -276,7 +397,20 @@ export function CompletionOverlay({
         </div>
       </dl>
       <div>
-        <button type="button" className="primary-action" onClick={onAgain}>
+        {onAnalyze && (
+          <button
+            type="button"
+            className="primary-action"
+            onClick={onAnalyze}
+          >
+            Rever partida
+          </button>
+        )}
+        <button
+          type="button"
+          className={onAnalyze ? 'secondary-action' : 'primary-action'}
+          onClick={onAgain}
+        >
           Outra grade
         </button>
         <button type="button" className="secondary-action" onClick={onHome}>

@@ -48,6 +48,7 @@ interface GameProps {
   copied: boolean
   onNew: () => void
   onHome: () => void
+  onAnalyze?: (() => void) | undefined
 }
 
 function boardValues(cells: GameState['cells']) {
@@ -81,6 +82,7 @@ export function Game({
   copied,
   onNew,
   onHome,
+  onAnalyze,
 }: GameProps) {
   const values = useMemo(() => boardValues(game.cells), [game.cells])
   const peers = useMemo(
@@ -236,13 +238,6 @@ export function Game({
             onDragSelect={onDragSelect}
             onKeyDown={handleKeyDown}
           />
-          {game.status === 'paused' && (
-            <PauseOverlay
-              elapsedMs={game.elapsedMs}
-              onResume={onPause}
-              onExit={onBack}
-            />
-          )}
         </div>
 
         <div className="controls-column">
@@ -284,8 +279,21 @@ export function Game({
         />
       )}
 
+      {game.status === 'paused' && (
+        <PauseOverlay
+          elapsedMs={game.elapsedMs}
+          onResume={onPause}
+          onExit={onBack}
+        />
+      )}
+
       {game.status === 'completed' && (
-        <CompletionOverlay game={game} onHome={onHome} onAgain={onNew} />
+        <CompletionOverlay
+          game={game}
+          onHome={onHome}
+          onAgain={onNew}
+          onAnalyze={onAnalyze}
+        />
       )}
     </main>
   )

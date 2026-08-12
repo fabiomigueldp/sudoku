@@ -18,9 +18,12 @@ import type {
 import {
   dailySeed,
   findHint,
+  GENERATOR_VERSION,
   generatePuzzleInWorker,
 } from './engine'
 import {
+  appendGameEvent,
+  createEventLog,
   createGameState,
   exportGameSnapshot,
   gameActions,
@@ -33,16 +36,18 @@ import {
   saveActiveSession,
   saveGameCompletion,
   saveSettings,
-  snapshotGame,
+  type GameAction,
+  type GameEventLog,
 } from './game'
 import { usePwaInstall } from './pwa/usePwaInstall'
+import { Analysis } from './ui/Analysis'
 import { Game } from './ui/Game'
 import { Home } from './ui/Home'
 import { Library } from './ui/Library'
 import { Settings } from './ui/Settings'
 import { Stats } from './ui/Stats'
 
-type Screen = 'home' | 'library' | 'game' | 'settings' | 'stats'
+type Screen = 'home' | 'library' | 'game' | 'settings' | 'stats' | 'analysis'
 type UpdateApp = (reloadPage?: boolean) => Promise<void>
 
 let audioContext: AudioContext | null = null
@@ -106,7 +111,7 @@ function randomSeed(variant: VariantId, difficulty: DifficultyId) {
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-  return `absolute-sudoku:free:v1:${variant}:${difficulty}:${entropy}`
+  return `absolute-sudoku:free:v2:g${GENERATOR_VERSION}:${variant}:${difficulty}:${entropy}`
 }
 
 const DAILY_SCHEDULE: ReadonlyArray<{
@@ -152,9 +157,11 @@ export function App() {
   const [checking, setChecking] = useState(false)
   const [copied, setCopied] = useState(false)
   const [updateApp, setUpdateApp] = useState<UpdateApp | null>(null)
+  const [sessionRevision, setSessionRevision] = useState(0)
 
   const settingsRef = useRef(settings)
   const gameRef = useRef(game)
+  const eventLogRef = useRef<GameEventLog | null>(null)
   const hydratedRef = useRef(false)
   const generationRef = useRef<AbortController | null>(null)
   const recordedCompletionRef = useRef<string | null>(null)
@@ -164,25 +171,62 @@ export function App() {
   settingsRef.current = settings
   gameRef.current = game
 
-  const dispatch = useCallback((action: Parameters<typeof reduceGame>[1]) => {
-    setGame((current) =>
-      current === null
-        ? null
-        : reduceGame(current, action, {
-            autoRemoveCandidates:
-              settingsRef.current.autoRemoveCandidates,
-            errorPolicy: settingsRef.current.errorPolicy,
-          }),
-    )
-    if (
-      action.type === 'input/digit' ||
-      action.type === 'input/color' ||
-      action.type === 'input/erase' ||
-      action.type === 'history/undo' ||
-      action.type === 'history/redo'
-    ) {
-      setChecking(false)
+  const dispatchMany = useCallback((actions: readonly GameAction[]) => {
+    let current = gameRef.current
+    if (current === null) return
+
+    let log = eventLogRef.current
+    let changed = false
+    let persistentChange = false
+    let clearsChecking = false
+
+    for (const action of actions) {
+      const next = reduceGame(current, action, {
+        autoRemoveCandidates: settingsRef.current.autoRemoveCandidates,
+        errorPolicy: settingsRef.current.errorPolicy,
+      })
+      if (next === current) continue
+
+      changed = true
+      current = next
+      if (action.type !== 'clock/tick') {
+        persistentChange = true
+        if (log !== null) {
+          const at =
+            typeof action.at === 'number' && Number.isFinite(action.at)
+              ? action.at
+              : Date.now()
+          log = appendGameEvent(log, action, at).log
+        }
+      }
+      if (
+        action.type === 'input/digit' ||
+        action.type === 'input/color' ||
+        action.type === 'input/erase' ||
+        action.type === 'history/undo' ||
+        action.type === 'history/redo'
+      ) {
+        clearsChecking = true
+      }
     }
+
+    if (!changed) return
+    gameRef.current = current
+    eventLogRef.current = log
+    setGame(current)
+    if (persistentChange) setSessionRevision((revision) => revision + 1)
+    if (clearsChecking) setChecking(false)
+  }, [])
+
+  const dispatch = useCallback(
+    (action: GameAction) => dispatchMany([action]),
+    [dispatchMany],
+  )
+
+  const persistCurrentSession = useCallback(() => {
+    const current = gameRef.current
+    if (current === null || !hydratedRef.current) return
+    void saveActiveSession(current, eventLogRef.current)
   }, [])
 
   const generateAndStart = useCallback(
@@ -208,16 +252,22 @@ export function App() {
           },
         )
         if (controller.signal.aborted) return
+        const startedAt = Date.now()
         const nextGame = createGameState(puzzle, {
-          now: Date.now(),
+          now: startedAt,
+          selectFirstEmpty: true,
+        })
+        const nextLog = createEventLog(puzzle, startedAt, {
           selectFirstEmpty: true,
         })
         recordedCompletionRef.current = null
+        gameRef.current = nextGame
+        eventLogRef.current = nextLog
         setGame(nextGame)
         setChecking(false)
         setMenuOpen(false)
         setScreen('game')
-        void saveActiveSession(nextGame)
+        void saveActiveSession(nextGame, nextLog)
         if ('storage' in navigator && 'persist' in navigator.storage) {
           void navigator.storage.persist().catch(() => false)
         }
@@ -259,6 +309,8 @@ export function App() {
     ]).then(([session, storedSettings, storedStats]) => {
       setSettings(storedSettings)
       setStats(storedStats)
+      gameRef.current = session?.state ?? null
+      eventLogRef.current = session?.eventLog ?? null
       setGame(session?.state ?? null)
       hydratedRef.current = true
       setLoading(false)
@@ -313,9 +365,10 @@ export function App() {
   }, [settings])
 
   useEffect(() => {
-    if (game === null || !hydratedRef.current) return
-    void saveActiveSession(game)
-  }, [game])
+    if (sessionRevision === 0 || !hydratedRef.current) return
+    const timer = window.setTimeout(persistCurrentSession, 180)
+    return () => window.clearTimeout(timer)
+  }, [persistCurrentSession, sessionRevision])
 
   useEffect(() => {
     if (game?.status !== 'completed') return
@@ -341,6 +394,7 @@ export function App() {
       if (document.visibilityState === 'hidden') {
         resumeWhenVisible = current?.status === 'playing'
         if (resumeWhenVisible) dispatch(gameActions.pause(Date.now()))
+        persistCurrentSession()
       } else if (resumeWhenVisible) {
         resumeWhenVisible = false
         dispatch(gameActions.resume(Date.now()))
@@ -349,7 +403,13 @@ export function App() {
     document.addEventListener('visibilitychange', handleVisibility)
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility)
-  }, [dispatch])
+  }, [dispatch, persistCurrentSession])
+
+  useEffect(() => {
+    const handlePageHide = () => persistCurrentSession()
+    window.addEventListener('pagehide', handlePageHide)
+    return () => window.removeEventListener('pagehide', handlePageHide)
+  }, [persistCurrentSession])
 
   useEffect(() => {
     const handleUpdate = (event: Event) => {
@@ -414,21 +474,18 @@ export function App() {
       const minColumn = Math.min(startColumn, endColumn)
       const maxColumn = Math.max(startColumn, endColumn)
 
-      setGame((current) => {
-        if (current === null) return null
-        let next = reduceGame(
-          current,
-          gameActions.select(game.anchor, 'replace'),
-        )
-        for (let row = minRow; row <= maxRow; row += 1) {
-          for (let column = minColumn; column <= maxColumn; column += 1) {
-            const cell = row * 9 + column
-            if (cell === game.anchor) continue
-            next = reduceGame(next, gameActions.select(cell, 'add'))
-          }
+      const at = Date.now()
+      const actions: GameAction[] = [
+        gameActions.select(game.anchor, 'replace', at),
+      ]
+      for (let row = minRow; row <= maxRow; row += 1) {
+        for (let column = minColumn; column <= maxColumn; column += 1) {
+          const cell = row * 9 + column
+          if (cell === game.anchor) continue
+          actions.push(gameActions.select(cell, 'add', at))
         }
-        return next
-      })
+      }
+      dispatchMany(actions)
       return
     }
 
@@ -481,40 +538,24 @@ export function App() {
   }
 
   const advanceHint = () => {
-    setGame((current) => {
-      if (current?.hint === null || current === null) return current
-      if (current.hint.phase === 4) {
-        return reduceGame(
-          current,
-          gameActions.applyHint(Date.now()),
-          {
-            autoRemoveCandidates:
-              settingsRef.current.autoRemoveCandidates,
-            errorPolicy: settingsRef.current.errorPolicy,
-          },
-        )
-      }
-      const nextHint = findHint(
-        current.cells,
-        current.puzzle,
-        (current.hint.phase + 1) as 2 | 3 | 4,
-      )
-      return nextHint === null ? current : { ...current, hint: nextHint }
-    })
+    const current = gameRef.current
+    if (current?.hint === null || current === null) return
+    if (current.hint.phase === 4) {
+      dispatch(gameActions.applyHint(Date.now()))
+      return
+    }
+    const nextHint = findHint(
+      current.cells,
+      current.puzzle,
+      (current.hint.phase + 1) as 2 | 3 | 4,
+    )
+    if (nextHint !== null) {
+      dispatch(gameActions.updateHint(nextHint, Date.now()))
+    }
   }
 
   const restart = () => {
-    setGame((current) => {
-      if (current === null) return null
-      const fresh = createGameState(current.puzzle, {
-        now: Date.now(),
-        selectFirstEmpty: true,
-      })
-      return {
-        ...fresh,
-        history: [...current.history, snapshotGame(current)],
-      }
-    })
+    dispatch(gameActions.restart(Date.now()))
     setMenuOpen(false)
     setChecking(false)
   }
@@ -536,10 +577,12 @@ export function App() {
             imported.status === 'playing' ? Date.now() : imported.lastResumedAt,
         }
         recordedCompletionRef.current = null
+        gameRef.current = resumed
+        eventLogRef.current = null
         setGame(resumed)
         setScreen('game')
         setGenerationError(null)
-        void saveActiveSession(resumed)
+        void saveActiveSession(resumed, null)
         return null
       } catch (error) {
         return error instanceof Error
@@ -550,15 +593,21 @@ export function App() {
 
     try {
       const puzzle = parseImportedPuzzle(normalized, variant, difficulty)
+      const startedAt = Date.now()
       const importedGame = createGameState(puzzle, {
-        now: Date.now(),
+        now: startedAt,
+        selectFirstEmpty: true,
+      })
+      const importedLog = createEventLog(puzzle, startedAt, {
         selectFirstEmpty: true,
       })
       recordedCompletionRef.current = null
+      gameRef.current = importedGame
+      eventLogRef.current = importedLog
       setGame(importedGame)
       setScreen('game')
       setGenerationError(null)
-      void saveActiveSession(importedGame)
+      void saveActiveSession(importedGame, importedLog)
       return null
     } catch (error) {
       return error instanceof Error
@@ -628,6 +677,17 @@ export function App() {
         />
       )}
 
+      {screen === 'analysis' &&
+        game !== null &&
+        eventLogRef.current !== null && (
+          <Analysis
+            game={game}
+            eventLog={eventLogRef.current}
+            settings={settings}
+            onBack={() => setScreen('game')}
+          />
+        )}
+
       {screen === 'game' && game !== null && (
         <Game
           game={game}
@@ -675,6 +735,11 @@ export function App() {
           copied={copied}
           onNew={() => setScreen('library')}
           onHome={goHome}
+          onAnalyze={
+            eventLogRef.current === null
+              ? undefined
+              : () => setScreen('analysis')
+          }
         />
       )}
     </div>

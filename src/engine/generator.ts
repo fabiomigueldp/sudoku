@@ -13,10 +13,15 @@ import { createSeededRandom, hashSeed } from './random'
 import { countSolutions, solve } from './solver'
 import { CELL_COUNT } from './topology'
 
+export const GENERATOR_VERSION = 3
+
 export interface DifficultyProfile {
   readonly targetClues: number
   readonly clueRange: readonly [minimum: number, maximum: number]
   readonly technique: string
+  readonly rankRange: readonly [minimum: number, maximum: number]
+  readonly targetRank: number
+  readonly attempts: number
 }
 
 export const DIFFICULTY_PROFILES: Readonly<Record<DifficultyId, DifficultyProfile>> = {
@@ -24,26 +29,41 @@ export const DIFFICULTY_PROFILES: Readonly<Record<DifficultyId, DifficultyProfil
     targetClues: 46,
     clueRange: [44, 49],
     technique: 'naked-single',
+    rankRange: [1, 1],
+    targetRank: 1,
+    attempts: 4,
   },
   focused: {
-    targetClues: 39,
+    targetClues: 40,
     clueRange: [37, 43],
     technique: 'hidden-single',
+    rankRange: [1, 3],
+    targetRank: 2,
+    attempts: 12,
   },
   challenging: {
-    targetClues: 34,
-    clueRange: [32, 37],
+    targetClues: 35,
+    clueRange: [30, 45],
     technique: 'locked-candidates-pointing',
+    rankRange: [3, 5],
+    targetRank: 3,
+    attempts: 56,
   },
   expert: {
-    targetClues: 29,
-    clueRange: [27, 32],
-    technique: 'naked-pair',
+    targetClues: 32,
+    clueRange: [26, 42],
+    technique: 'naked-triple',
+    rankRange: [5, 6],
+    targetRank: 6,
+    attempts: 56,
   },
   master: {
-    targetClues: 25,
-    clueRange: [22, 28],
-    technique: 'x-wing',
+    targetClues: 29,
+    clueRange: [22, 40],
+    technique: 'swordfish',
+    rankRange: [6, 8],
+    targetRank: 7,
+    attempts: 64,
   },
 }
 
@@ -89,14 +109,6 @@ const DIFFICULTIES: readonly DifficultyId[] = [
 ]
 const VARIANTS: readonly VariantId[] = ['classic', 'diagonal', 'anti-knight']
 
-const TARGET_TECHNIQUE_RANK: Readonly<Record<DifficultyId, number>> = {
-  relaxed: 1,
-  focused: 2,
-  challenging: 3,
-  expert: 4,
-  master: 5,
-}
-
 interface RatedCandidate {
   solution: number[]
   givens: number[]
@@ -111,7 +123,7 @@ function difficultyTechniqueRank(technique: DifficultyTechnique): number {
   ) {
     return technique === 'none' ? 0 : 99
   }
-  if (technique === 'search-required') return 6
+  if (technique === 'search-required') return 99
   return LOGICAL_TECHNIQUE_RANK[technique]
 }
 
@@ -119,10 +131,10 @@ function candidatePenalty(
   candidate: RatedCandidate,
   difficulty: DifficultyId,
 ): number {
-  const desiredRank = TARGET_TECHNIQUE_RANK[difficulty]
+  const desiredRank = DIFFICULTY_PROFILES[difficulty].targetRank
   const actualRank = candidate.analysis.solvedLogically
     ? difficultyTechniqueRank(candidate.analysis.hardestTechnique)
-    : 6
+    : 99
   const techniqueDistance =
     actualRank < desiredRank
       ? (desiredRank - actualRank) * 3
@@ -133,7 +145,32 @@ function candidatePenalty(
 
   // Technique is the primary signal. Clue count only breaks ties between
   // candidates with similarly human-solvable paths.
-  return techniqueDistance * 1_000 + clueDistance * 10 + candidate.attempt
+  const workDistance = Math.abs(
+    candidate.analysis.steps.length -
+      Math.max(1, 81 - DIFFICULTY_PROFILES[difficulty].targetClues),
+  )
+  return (
+    techniqueDistance * 1_000 +
+    clueDistance * 10 +
+    workDistance +
+    candidate.attempt
+  )
+}
+
+function candidateMatchesProfile(
+  candidate: RatedCandidate,
+  difficulty: DifficultyId,
+): boolean {
+  if (!candidate.analysis.solvedLogically) return false
+  const profile = DIFFICULTY_PROFILES[difficulty]
+  const rank = difficultyTechniqueRank(candidate.analysis.hardestTechnique)
+  const clues = clueCount(candidate.givens)
+  return (
+    rank >= profile.rankRange[0] &&
+    rank <= profile.rankRange[1] &&
+    clues >= profile.clueRange[0] &&
+    clues <= profile.clueRange[1]
+  )
 }
 
 function assertGenerationInput(
@@ -170,53 +207,74 @@ function rotationalGroups(): number[][] {
   return groups
 }
 
-function tryRemove(
-  givens: number[],
-  cells: readonly number[],
-  variant: VariantId,
-  targetClues: number,
-): boolean {
-  const presentCells = cells.filter((cell) => givens[cell] !== 0)
-  if (presentCells.length === 0) return false
-  if (clueCount(givens) - presentCells.length < targetClues) return false
-
-  const previous = presentCells.map((cell) => givens[cell] as number)
-  for (const cell of presentCells) givens[cell] = 0
-
-  if (countSolutions(givens, variant, 2) === 1) return true
-
-  presentCells.forEach((cell, index) => {
-    givens[cell] = previous[index] as number
-  })
-  return false
-}
-
-function carvePuzzle(
+function carveRatedPuzzle(
   solution: readonly number[],
   variant: VariantId,
-  targetClues: number,
+  difficulty: DifficultyId,
   random: ReturnType<typeof createSeededRandom>,
-): number[] {
+  attempt: number,
+): RatedCandidate | null {
+  const profile = DIFFICULTY_PROFILES[difficulty]
   const givens = [...solution]
+  let best: RatedCandidate | null = null
 
-  // Rotational symmetry gives the initial composition a calm visual balance.
+  // Every accepted removal preserves uniqueness, human solvability and full
+  // rotational symmetry. Difficulty is observed during carving, rather than
+  // guessed later from clue density.
   for (const group of random.shuffle(rotationalGroups())) {
-    if (clueCount(givens) <= targetClues) break
-    tryRemove(givens, group, variant, targetClues)
+    const presentCells = group.filter((cell) => givens[cell] !== 0)
+    if (presentCells.length === 0) continue
+    if (
+      clueCount(givens) - presentCells.length < profile.clueRange[0]
+    ) {
+      continue
+    }
+
+    const previous = presentCells.map((cell) => givens[cell] as number)
+    for (const cell of presentCells) givens[cell] = 0
+
+    const unique = countSolutions(givens, variant, 2) === 1
+    const analysis = unique
+      ? analyzeDifficulty(givens, variant)
+      : null
+    const rank =
+      analysis === null
+        ? 99
+        : difficultyTechniqueRank(analysis.hardestTechnique)
+    const withinCeiling =
+      analysis?.solvedLogically === true && rank <= profile.rankRange[1]
+
+    if (!unique || !withinCeiling) {
+      presentCells.forEach((cell, index) => {
+        givens[cell] = previous[index] as number
+      })
+      continue
+    }
+
+    const candidate: RatedCandidate = {
+      solution: [...solution],
+      givens: [...givens],
+      analysis,
+      attempt,
+    }
+    if (
+      candidateMatchesProfile(candidate, difficulty) &&
+      (best === null ||
+        candidatePenalty(candidate, difficulty) <
+          candidatePenalty(best, difficulty))
+    ) {
+      best = candidate
+    }
+
+    if (
+      best !== null &&
+      clueCount(givens) <= profile.targetClues
+    ) {
+      break
+    }
   }
 
-  // A final single-cell pass reaches the profile more reliably when a
-  // symmetrical pair was essential. Uniqueness is checked after every change.
-  const remaining = givens
-    .map((value, index) => (value === 0 ? -1 : index))
-    .filter((index) => index >= 0)
-
-  for (const cell of random.shuffle(remaining)) {
-    if (clueCount(givens) <= targetClues) break
-    tryRemove(givens, [cell], variant, targetClues)
-  }
-
-  return givens
+  return best
 }
 
 function normalizeOptions(
@@ -260,15 +318,13 @@ export function generatePuzzle(
     options.generatedAt,
   )
 
-  const profile = DIFFICULTY_PROFILES[options.difficulty]
   let bestCandidate: RatedCandidate | null = null
+  let preferredCandidates = 0
 
-  // Rate a small deterministic candidate pool by the actual human solve path.
-  // Three candidates preserves interactive generation speed while avoiding a
-  // misleading clue-density-only label.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  const profile = DIFFICULTY_PROFILES[options.difficulty]
+  for (let attempt = 0; attempt < profile.attempts; attempt += 1) {
     const random = createSeededRandom(
-      `absolute-sudoku:generation:v2:${options.seed}:${options.variant}:${options.difficulty}:${attempt}`,
+      `absolute-sudoku:generation:v${GENERATOR_VERSION}:${options.seed}:${options.variant}:${options.difficulty}:${attempt}`,
     )
     const solution = solve(new Array<number>(CELL_COUNT).fill(0), options.variant, {
       random,
@@ -276,23 +332,18 @@ export function generatePuzzle(
 
     if (solution === null) continue
 
-    const minimumClues = profile.clueRange[0]
-    const attemptTarget = Math.round(
-      profile.targetClues -
-        ((profile.targetClues - minimumClues) * attempt) / 2,
-    )
-    const givens = carvePuzzle(
+    const candidate = carveRatedPuzzle(
       solution,
       options.variant,
-      attemptTarget,
+      options.difficulty,
       random,
-    )
-    const candidate: RatedCandidate = {
-      solution,
-      givens,
-      analysis: analyzeDifficulty(givens, options.variant),
       attempt,
-    }
+    )
+    if (candidate === null) continue
+    const candidateRank = difficultyTechniqueRank(
+      candidate.analysis.hardestTechnique,
+    )
+    if (candidateRank >= profile.targetRank) preferredCandidates += 1
 
     if (
       bestCandidate === null ||
@@ -301,14 +352,18 @@ export function generatePuzzle(
     ) {
       bestCandidate = candidate
     }
+
+    if (preferredCandidates >= 2) break
   }
 
   if (bestCandidate === null) {
-    throw new Error(`Unable to generate a ${options.variant} Sudoku solution`)
+    throw new Error(
+      `Unable to generate a logically rated ${options.difficulty} ${options.variant} Sudoku`,
+    )
   }
 
   const fingerprint = hashSeed(
-    `${options.seed}|${options.variant}|${options.difficulty}|v2`,
+    `${options.seed}|${options.variant}|${options.difficulty}|v${GENERATOR_VERSION}`,
   )
     .toString(16)
     .padStart(8, '0')

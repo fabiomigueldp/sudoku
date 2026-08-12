@@ -181,8 +181,26 @@ function techniqueTitle(technique: LogicalStep['technique']): string {
       return 'Candidatos confinados'
     case 'naked-pair':
       return 'Par nu'
+    case 'hidden-pair':
+      return 'Par oculto'
+    case 'naked-triple':
+      return 'Trinca nua'
+    case 'hidden-triple':
+      return 'Trinca oculta'
+    case 'naked-quad':
+      return 'Quarteto nu'
+    case 'hidden-quad':
+      return 'Quarteto oculto'
     case 'x-wing':
       return 'X-Wing'
+    case 'skyscraper':
+      return 'Skyscraper'
+    case 'swordfish':
+      return 'Swordfish'
+    case 'xy-wing':
+      return 'XY-Wing'
+    case 'jellyfish':
+      return 'Jellyfish'
     case 'hidden-single':
       return 'Único lugar'
     case 'naked-single':
@@ -198,11 +216,7 @@ function advancedLogicalMove(
   const first = logical.steps[0]
   if (
     first === undefined ||
-    first.action !== 'eliminate' ||
-    (first.technique !== 'locked-candidates-pointing' &&
-      first.technique !== 'locked-candidates-claiming' &&
-      first.technique !== 'naked-pair' &&
-      first.technique !== 'x-wing')
+    first.action !== 'eliminate'
   ) {
     return null
   }
@@ -219,12 +233,7 @@ function advancedLogicalMove(
 
   const eliminatedDigits = first.digits.join(' e ')
   const affectedCount = first.affectedCells.length
-  const patternName =
-    first.technique === 'naked-pair'
-      ? `O par ${eliminatedDigits}`
-      : first.technique === 'x-wing'
-        ? `O X-Wing de ${eliminatedDigits}`
-        : `O ${eliminatedDigits} confinado`
+  const patternName = techniqueTitle(first.technique)
   const context = uniqueCells([
     ...first.cells,
     ...first.affectedCells,
@@ -240,7 +249,7 @@ function advancedLogicalMove(
     explanations: [
       'Há um padrão de candidatos que libera o próximo passo lógico.',
       `Compare as casas do padrão com as ${affectedCount} casas alcançadas por ele.`,
-      `${patternName} elimina candidatos dessas casas e força a continuação.`,
+      `${patternName} elimina ${eliminatedDigits} das casas alcançadas e força a continuação.`,
       `Depois dessas eliminações, coloque ${placement.digit} na casa destacada.`,
     ],
   }

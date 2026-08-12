@@ -64,21 +64,25 @@ export const DIFFICULTIES: ReadonlyArray<{
   description: string
 }> = [
   { id: 'relaxed', name: 'Sereno', description: 'Singles e leitura direta.' },
-  { id: 'focused', name: 'Focado', description: 'Singles ocultos e interações simples.' },
+  {
+    id: 'focused',
+    name: 'Focado',
+    description: 'Leitura direta, singles ocultos e interações simples.',
+  },
   {
     id: 'challenging',
     name: 'Desafiador',
-    description: 'Pares, candidatos bloqueados e mais trabalho.',
+    description: 'Candidatos bloqueados, pares e subconjuntos.',
   },
   {
     id: 'expert',
     name: 'Especialista',
-    description: 'Técnicas avançadas e poucas concessões.',
+    description: 'Subconjuntos avançados, X-Wing e Skyscraper.',
   },
   {
     id: 'master',
     name: 'Mestre',
-    description: 'Grades densas para raciocínio prolongado.',
+    description: 'Fish e wings para raciocínio prolongado.',
   },
 ]
 

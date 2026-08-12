@@ -350,7 +350,8 @@
 
   .library-layout,
   .settings-layout,
-  .stats-layout {
+  .stats-layout,
+  .analysis-layout {
     width: min(100%, 860px);
     margin: 42px auto 0;
   }
@@ -379,6 +380,24 @@
     display: grid;
     grid-template-columns: 0.7fr 1.3fr;
     gap: 68px;
+  }
+
+  .analysis-layout {
+    display: grid;
+    width: min(100%, 1080px);
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 330px);
+    align-items: center;
+    gap: clamp(34px, 6vw, 76px);
+  }
+
+  .analysis-board {
+    display: grid;
+    min-width: 0;
+    place-items: center;
+  }
+
+  .analysis-board .board-frame {
+    width: min(62vw, 64dvh, 640px);
   }
 
   .game-screen {
@@ -1045,6 +1064,75 @@
     margin-top: 26px;
   }
 
+  .analysis-inspector {
+    min-width: 0;
+    border-top: 1px solid var(--line-strong);
+  }
+
+  .analysis-step {
+    display: grid;
+    min-height: 118px;
+    align-content: center;
+    gap: 5px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .analysis-step small,
+  .analysis-facts dt {
+    color: var(--ink-soft);
+    font-size: 0.7rem;
+  }
+
+  .analysis-step h2 {
+    font-size: 1.18rem;
+    font-weight: 660;
+    letter-spacing: -0.025em;
+  }
+
+  .analysis-step p {
+    color: var(--ink-soft);
+    font-size: 0.8rem;
+  }
+
+  .analysis-range {
+    width: 100%;
+    height: 44px;
+    margin-top: 10px;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .analysis-navigation {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .analysis-navigation .secondary-action {
+    min-width: 0;
+  }
+
+  .analysis-facts {
+    margin-top: 26px;
+    border-top: 1px solid var(--line);
+  }
+
+  .analysis-facts > div {
+    display: flex;
+    min-height: 58px;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .analysis-facts dd {
+    font-size: 0.8rem;
+    font-weight: 620;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
   .game-header > .icon-button {
     justify-self: start;
   }
@@ -1176,6 +1264,10 @@
 
   .sudoku-cell[data-given] .cell-value {
     font-weight: 690;
+  }
+
+  .sudoku-cell[data-readonly] {
+    cursor: default;
   }
 
   .corner-notes {
@@ -1499,6 +1591,13 @@
     margin-top: 30px;
   }
 
+  .pause-overlay {
+    position: fixed;
+    z-index: 40;
+    padding: var(--safe-top) var(--safe-right) var(--safe-bottom)
+      var(--safe-left);
+  }
+
   .sheet-layer {
     position: fixed;
     z-index: 50;
@@ -1608,6 +1707,10 @@
     font-size: 2rem;
     font-weight: 620;
     letter-spacing: -0.04em;
+  }
+
+  .completion-overlay > p[tabindex="-1"]:focus {
+    outline: none;
   }
 
   .completion-overlay dl {
@@ -1823,7 +1926,8 @@
 
     .library-layout,
     .settings-layout,
-    .stats-layout {
+    .stats-layout,
+    .analysis-layout {
       width: min(100%, 560px);
       grid-template-columns: 1fr;
       gap: 34px;
@@ -1845,6 +1949,21 @@
 
     .stats-layout {
       gap: 42px;
+    }
+
+    .analysis-layout {
+      margin-top: 22px;
+    }
+
+    .analysis-board .board-frame {
+      width: min(
+        calc(100vw - var(--safe-left) - var(--safe-right)),
+        560px
+      );
+    }
+
+    .analysis-inspector {
+      width: 100%;
     }
 
     .stats-summary {

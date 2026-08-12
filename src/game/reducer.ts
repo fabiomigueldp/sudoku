@@ -63,6 +63,7 @@ export type GameAction =
       hint: Omit<HintStep, 'phase'> | HintStep
     })
   | (TimestampedAction & { type: 'hint/set-phase'; phase: 1 | 2 | 3 | 4 })
+  | (TimestampedAction & { type: 'hint/update'; hint: HintStep })
   | (TimestampedAction & { type: 'hint/advance' })
   | (TimestampedAction & { type: 'hint/retreat' })
   | (TimestampedAction & { type: 'hint/dismiss' })
@@ -601,11 +602,24 @@ export function reduceGame(
   }
 
   if (action.type === 'game/restart') {
-    return createGameState(state.puzzle, {
+    const restarted = createGameState(state.puzzle, {
       now: at ?? state.lastResumedAt ?? 0,
       startPaused: action.startPaused ?? false,
       selectFirstEmpty: true,
     })
+    return {
+      ...restarted,
+      history: capSnapshots(
+        [...state.history, snapshotGame(state)],
+        options.maxHistory,
+      ),
+    }
+  }
+
+  if (action.type === 'hint/update') {
+    return state.hint === null
+      ? state
+      : { ...state, hint: { ...action.hint } }
   }
 
   return state
@@ -662,6 +676,8 @@ export const gameActions = {
   ): GameAction => timed({ type: 'hint/show', hint }, at),
   setHintPhase: (phase: HintStep['phase'], at?: number): GameAction =>
     timed({ type: 'hint/set-phase', phase }, at),
+  updateHint: (hint: HintStep, at?: number): GameAction =>
+    timed({ type: 'hint/update', hint }, at),
   advanceHint: (at?: number): GameAction =>
     timed({ type: 'hint/advance' }, at),
   retreatHint: (at?: number): GameAction =>
