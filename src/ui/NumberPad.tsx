@@ -102,7 +102,7 @@ export function NumberPad({
         <div className="number-pad" aria-label="Números">
           {Array.from({ length: 9 }, (_, index) => {
             const digit = (index + 1) as Digit
-            const remaining = 9 - (counts[index] ?? 0)
+            const remaining = Math.max(0, 9 - (counts[index] ?? 0))
             const inputLabel =
               mode === 'corner'
                 ? `${digit}, marca de canto`
@@ -115,7 +115,6 @@ export function NumberPad({
                 className="number-key"
                 key={digit}
                 data-active={activeDigit === digit || undefined}
-                disabled={remaining === 0 && mode === 'value'}
                 onClick={() => onDigit(digit)}
                 aria-label={
                   showRemaining

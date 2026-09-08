@@ -261,7 +261,6 @@ export function Analysis({
             readOnly
             onSelect={() => undefined}
             onDragSelect={() => undefined}
-            onKeyDown={() => undefined}
           />
           {pattern && (
             <p className="analysis-legend">

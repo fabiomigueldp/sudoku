@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { DEFAULT_SETTINGS } from '../../src/domain/catalog'
 import {
   addGameRecord,
+  checkpointActiveSession,
   clearActiveSession,
   createGameRecord,
   createGameState,
@@ -38,6 +39,21 @@ describe('game persistence and statistics', () => {
   it('merges partial or malformed preferences into safe defaults', async () => {
     await saveSettings({ ...DEFAULT_SETTINGS, theme: 'dark', sound: true })
     expect(await loadSettings()).toMatchObject({ theme: 'dark', sound: true })
+  })
+
+  it('recovers a newer synchronous checkpoint while an older save is queued', async () => {
+    const initial = createGameState(puzzleWithGivens(), { now: 0 })
+    const pending = saveActiveSession(initial, null, 100)
+    const edited = reduceGame(initial, gameActions.setDigit(4, 200))
+    checkpointActiveSession(edited, null, 200)
+    await pending
+    expect((await loadActiveSession({ rebaseRunningClock: false }))?.state).toEqual(edited)
+
+    const newer = reduceGame(edited, gameActions.setDigit(5, 300))
+    await saveActiveSession(newer, null, 300)
+    expect((await loadActiveSession({ rebaseRunningClock: false }))?.state).toEqual(newer)
+    await clearActiveSession()
+    expect(await loadActiveSession()).toBeNull()
   })
 
   it('updates daily streaks once per calendar day', () => {

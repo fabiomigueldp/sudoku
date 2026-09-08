@@ -11,7 +11,7 @@ interface LibraryProps {
     value: string,
     variant: VariantId,
     difficulty: DifficultyId,
-  ) => string | null
+  ) => Promise<string | null>
   generating: boolean
   error: string | null
 }
@@ -29,6 +29,7 @@ export function Library({
   const [importOpen, setImportOpen] = useState(false)
   const [importValue, setImportValue] = useState('')
   const [importError, setImportError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
   const activeVariant = VARIANTS.find((item) => item.id === variant)!
 
   return (
@@ -117,10 +118,15 @@ export function Library({
           {importOpen && (
             <form
               className="import-form"
-              onSubmit={(event) => {
+              onSubmit={async (event) => {
                 event.preventDefault()
-                const result = onImport(importValue, variant, difficulty)
-                setImportError(result)
+                if (importing || generating) return
+                setImporting(true)
+                try {
+                  setImportError(await onImport(importValue, variant, difficulty))
+                } finally {
+                  setImporting(false)
+                }
               }}
             >
               <label htmlFor="puzzle-import">
@@ -147,9 +153,9 @@ export function Library({
               <button
                 type="submit"
                 className="secondary-action"
-                disabled={!importValue.trim()}
+                disabled={!importValue.trim() || importing || generating}
               >
-                Abrir grade
+                {importing ? 'Abrindo…' : 'Abrir grade'}
               </button>
             </form>
           )}
@@ -176,7 +182,7 @@ export function Library({
           <button
             type="button"
             className="primary-action"
-            disabled={generating}
+            disabled={generating || importing}
             onClick={() => onStart(variant, difficulty)}
           >
             {generating ? 'Construindo grade…' : 'Começar'}

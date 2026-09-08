@@ -5,6 +5,7 @@ import {
   CheckIcon,
   CloseIcon,
   CopyIcon,
+  SavedGamesIcon,
   LightbulbIcon,
   PlayIcon,
   SlidersIcon,
@@ -179,7 +180,7 @@ export function HintPanel({
         ? 'Explicar o padrão'
         : hint.phase === 3
           ? 'Mostrar o passo'
-          : 'Aplicar'
+          : hint.digit === undefined ? 'Entendi' : 'Aplicar'
   return (
     <aside className="hint-panel" aria-live="polite">
       <LightbulbIcon />
@@ -204,6 +205,7 @@ export function HintPanel({
 export function GameMenu({
   onClose,
   onSettings,
+  onSaved,
   onCheck,
   onRestart,
   onCopy,
@@ -211,6 +213,7 @@ export function GameMenu({
 }: {
   onClose: () => void
   onSettings: () => void
+  onSaved: () => void
   onCheck: () => void
   onRestart: () => void
   onCopy: () => void
@@ -325,6 +328,13 @@ export function GameMenu({
           <span>
             <strong>Ajustes do jogo</strong>
             <small>Realces, erros, resposta e aparência.</small>
+          </span>
+        </button>
+        <button type="button" onClick={onSaved}>
+          <SavedGamesIcon />
+          <span>
+            <strong>Partidas salvas</strong>
+            <small>Continue outra grade. Esta fica salva.</small>
           </span>
         </button>
         <button type="button" onClick={onCopy}>

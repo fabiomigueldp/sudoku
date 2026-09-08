@@ -22,9 +22,9 @@ event log, no arquivo, na prática ou no backup devem atualizar seus respectivos
 schemas e documentar a migração.
 
 Marcadores atuais: `GENERATOR_VERSION = 3`, `EVENT_LOG_VERSION = 1`,
-`STORAGE_SCHEMA_VERSION = 3`, `ARCHIVED_GAME_VERSION = 1`,
+`STORAGE_SCHEMA_VERSION = 4`, `ARCHIVED_GAME_VERSION = 1`,
 `PRACTICE_VERSION = 1`, `PRACTICE_PROGRESS_VERSION = 1` e
-`DATA_BACKUP_VERSION = 1`.
+`DATA_BACKUP_VERSION = 2`. Saves anteriores e backups v1 migram automaticamente.
 
 ## O que já está incluído
 
@@ -39,6 +39,9 @@ Marcadores atuais: `GENERATOR_VERSION = 3`, `EVENT_LOG_VERSION = 1`,
 - Autosave serializado no IndexedDB, migrações, fallback seguro, estatísticas
   locais, arquivo permanente de partidas e retomada após recarga ou
   encerramento.
+- Várias partidas em andamento, com acesso rápido à última, prévias das grades,
+  progresso, organização e exclusão individual. Cada tentativa preserva suas
+  notas, cores, seleção, dicas, tempo e histórico; começar outra não a substitui.
 - Histórico de eventos por partida e análise pós-jogo, com reprodução de cada
   movimento, mudanças realizadas, comparação com o caminho lógico e acesso
   direto aos momentos que merecem revisão.
@@ -67,6 +70,10 @@ Comandos principais:
 - `npm run preview`: serve localmente a versão de produção.
 - `npm test`: executa os testes uma vez.
 - `npm run test:watch`: acompanha os testes durante o desenvolvimento.
+- `npm run test:ui`: testa a jogabilidade no Chromium, Firefox, WebKit e
+  Chromium com emulação móvel. Instale os navegadores uma vez com
+  `npx playwright install chromium firefox webkit`. O servidor de teste usa
+  a porta 4187; os testes usam sessões isoladas e não alteram suas partidas.
 - `npm run typecheck`: valida TypeScript sem emitir arquivos.
 - `npm run lint`: executa ESLint com regras para React, hooks, TypeScript e
   imports.
@@ -89,12 +96,25 @@ React cuida somente da interação e da apresentação.
 
 ## Dados locais e backup
 
+**Partidas salvas**, abaixo de “Continuar” e no menu da partida, reúne as grades
+em andamento por última atividade. A troca pausa e salva a partida atual antes
+de abrir outra. O desafio diário retoma a tentativa do dia já iniciada. Partidas
+concluídas passam para o arquivo, sem ocupar a lista de jogos em andamento.
+“Organizar” revela a exclusão individual com confirmação na própria linha.
+
 Partidas em andamento, preferências, estatísticas, práticas e partidas
 concluídas permanecem neste dispositivo. Em **Ajustes → Dados**, “Exportar
 backup” cria um arquivo JSON portátil; “Restaurar backup” valida formato,
 versão, integridade e conteúdo antes de pedir confirmação. A restauração
 substitui o conjunto local completo. “Apagar dados” exige uma segunda ação e
 remove todo o conteúdo local do aplicativo.
+
+O schema de armazenamento v4 usa IndexedDB v5, com registros independentes por
+tentativa e um índice leve para a lista. O save único anterior e checkpoints
+pendentes são recuperados sem duplicar a tentativa. O backup v2 inclui todas
+as partidas salvas e continua aceitando arquivos v1. Se o navegador não puder
+gravar nem no IndexedDB nem no fallback local, o aplicativo informa a falha e
+mantém o progresso em memória para exportação.
 
 O arquivo de partidas fica em **Seu jogo**. Partidas novas preservam o estado
 final e, quando o log é compatível, toda a linha do tempo. Registros antigos que
@@ -118,6 +138,7 @@ Antes de entregar uma mudança, execute:
 npm run typecheck
 npm run lint
 npm test
+npm run test:ui
 npm run build
 ```
 

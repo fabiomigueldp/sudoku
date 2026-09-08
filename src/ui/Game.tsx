@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useCallback, useLayoutEffect, useMemo } from 'react'
 import type {
   CellColor,
   Digit,
@@ -6,7 +6,6 @@ import type {
   GameState,
   InputMode,
 } from '../domain/types'
-import { DIGIT_COLOR_MAP } from '../domain/catalog'
 import { candidatesFor, conflictingCells, peersFor } from '../engine'
 import { Board } from './Board'
 import { GameHeader } from './GameHeader'
@@ -44,6 +43,7 @@ interface GameProps {
   onCheck: () => void
   onRestart: () => void
   onSettings: () => void
+  onSaved: () => void
   onCopy: () => void
   copied: boolean
   contextLabel?: string | undefined
@@ -79,6 +79,7 @@ export function Game({
   onCheck,
   onRestart,
   onSettings,
+  onSaved,
   onCopy,
   copied,
   contextLabel,
@@ -96,12 +97,19 @@ export function Game({
       ),
     [game.anchor, game.puzzle.variant],
   )
+  const checkSolution = checking || settings.errorPolicy === 'solution' ||
+    (settings.errorPolicy === 'completion' && values.every((value) => value !== 0))
+  const checkConflicts = checkSolution || settings.errorPolicy === 'conflicts'
   const structuralConflicts = useMemo(
-    () => new Set(conflictingCells(values, game.puzzle.variant)),
-    [values, game.puzzle.variant],
+    () => new Set(
+      checkConflicts
+        ? conflictingCells(values, game.puzzle.variant)
+        : [],
+    ),
+    [values, game.puzzle.variant, checkConflicts],
   )
   const solutionConflicts = useMemo(() => {
-    if (settings.errorPolicy !== 'solution' && !checking) {
+    if (!checkSolution) {
       return new Set<number>()
     }
     return new Set(
@@ -109,7 +117,7 @@ export function Game({
         value !== 0 && value !== game.puzzle.solution[index] ? [index] : [],
       ),
     )
-  }, [checking, game.puzzle.solution, settings.errorPolicy, values])
+  }, [checkSolution, game.puzzle.solution, values])
   const conflicts = useMemo(
     () => new Set([...structuralConflicts, ...solutionConflicts]),
     [structuralConflicts, solutionConflicts],
@@ -149,7 +157,12 @@ export function Game({
     })
   }, [game.cells, game.puzzle.variant, settings.autoCandidates, values])
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+  const handleKeyDown = useCallback((event: KeyboardEvent) => {
+    if (menuOpen || game.status !== 'playing' || event.defaultPrevented ||
+      event.isComposing || event.altKey) return
+    const target = event.target
+    if (target instanceof HTMLElement &&
+      target.closest('input, textarea, select, [contenteditable="true"]')) return
     const directionByKey: Partial<
       Record<
         string,
@@ -164,25 +177,26 @@ export function Game({
       End: 'end',
     }
     const direction = directionByKey[event.key]
-    if (direction) {
+    if (direction && !event.ctrlKey && !event.metaKey) {
       event.preventDefault()
       onMoveSelection(direction, event.shiftKey)
       return
     }
 
-    if (/^[1-9]$/.test(event.key)) {
+    const digitKey = /^[1-9]$/.test(event.key)
+      ? event.key
+      : event.shiftKey && /^(Digit|Numpad)[1-9]$/.test(event.code)
+        ? event.code.at(-1)
+        : undefined
+    if (digitKey !== undefined) {
       event.preventDefault()
-      const digit = Number(event.key) as Digit
+      if (event.repeat) return
+      const digit = Number(digitKey) as Digit
       const directMode = event.ctrlKey || event.metaKey
         ? 'center'
         : event.shiftKey
           ? 'corner'
           : undefined
-      if (game.inputMode === 'color' && directMode === undefined) {
-        const color = DIGIT_COLOR_MAP[digit]
-        if (color !== undefined) onColor(color)
-        return
-      }
       onDigit(digit, directMode)
       return
     }
@@ -193,8 +207,10 @@ export function Game({
       return
     }
 
-    if (event.key === ' ') {
+    if (event.key === ' ' && target instanceof HTMLElement &&
+      target.closest('[role="gridcell"]')) {
       event.preventDefault()
+      if (event.repeat) return
       const modes: InputMode[] = ['value', 'corner', 'center', 'color']
       const next = modes[(modes.indexOf(game.inputMode) + 1) % modes.length]
       if (next) onMode(next)
@@ -209,7 +225,17 @@ export function Game({
       if (event.shiftKey) onRedo()
       else onUndo()
     }
-  }
+  }, [
+    game.inputMode, game.status, menuOpen, onDigit, onErase,
+    onMode, onMoveSelection, onRedo, onUndo,
+  ])
+
+  useLayoutEffect(() => {
+    // Safari can leave focus on the body after a tool click. Route shortcuts
+    // for the mounted game, including this native focus state.
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   return (
     <main className="game-screen">
@@ -237,9 +263,9 @@ export function Game({
             conflicts={conflicts}
             peers={peers}
             hint={game.hint}
+            readOnly={menuOpen || game.status !== 'playing'}
             onSelect={onSelect}
             onDragSelect={onDragSelect}
-            onKeyDown={handleKeyDown}
           />
         </div>
 
@@ -273,6 +299,7 @@ export function Game({
 
       {menuOpen && (
         <GameMenu
+          onSaved={onSaved}
           onClose={() => onMenu(false)}
           onSettings={onSettings}
           onCheck={onCheck}

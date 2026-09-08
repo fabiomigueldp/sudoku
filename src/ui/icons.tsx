@@ -109,6 +109,15 @@ export function CheckIcon(props: IconProps) {
   )
 }
 
+export function SavedGamesIcon(props: IconProps) {
+  return (
+    <svg {...iconProps} {...props}>
+      <rect x="7" y="7" width="13" height="13" rx="1" />
+      <path d="M16 4H4v12M11.5 7v13M15.5 7v13M7 11.5h13M7 15.5h13" />
+    </svg>
+  )
+}
+
 export function InstallIcon(props: IconProps) {
   return (
     <svg {...iconProps} {...props}>

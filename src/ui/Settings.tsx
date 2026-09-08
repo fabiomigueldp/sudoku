@@ -100,10 +100,10 @@ export function Settings({
 
   const describeBackup = (summary: BackupSummary) => {
     const parts = [
-      `${summary.archivedGames} ${summary.archivedGames === 1 ? 'partida' : 'partidas'}`,
+      `${summary.archivedGames} ${summary.archivedGames === 1 ? 'concluída' : 'concluídas'}`,
       `${summary.practiceSessions} ${summary.practiceSessions === 1 ? 'prática' : 'práticas'}`,
     ]
-    if (summary.hasActiveSession) parts.push('uma partida em andamento')
+    parts.unshift(`${summary.savedGames} em andamento`)
     return parts.join(' · ')
   }
 
@@ -336,7 +336,9 @@ export function Settings({
                         setPendingRestore(null)
                         setClearPending(false)
                         setDataMessage(
-                          `Backup restaurado · ${describeBackup(result)}`,
+                          result.storage.durable === false
+                            ? 'Backup aberto, mas o navegador não conseguiu gravá-lo. Mantenha o app aberto e guarde o arquivo.'
+                            : `Backup restaurado · ${describeBackup(result)}`,
                         )
                       })
                       .catch((error: unknown) => {
@@ -372,7 +374,11 @@ export function Settings({
                   disabled={dataBusy}
                   onClick={() => {
                     setDataBusy(true)
-                    void onClearData().finally(() => setDataBusy(false))
+                    void onClearData()
+                      .catch((error: unknown) => {
+                        setDataMessage(error instanceof Error ? error.message : 'Não foi possível apagar os dados.')
+                      })
+                      .finally(() => setDataBusy(false))
                   }}
                 >
                   Apagar definitivamente

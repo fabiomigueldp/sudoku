@@ -11,11 +11,12 @@ import {
   type StorageWriteResult,
 } from './persistence'
 
-export const DATA_BACKUP_VERSION = 1 as const
+export const DATA_BACKUP_VERSION = 2 as const
 export const DATA_BACKUP_FORMAT = 'absolute-sudoku-backup' as const
 
 interface BackupPayload {
   session: unknown
+  sessions: unknown[]
   settings: unknown
   stats: unknown
   archives: unknown[]
@@ -33,6 +34,7 @@ interface BackupDocument {
 export interface BackupSummary {
   exportedAt: number
   hasActiveSession: boolean
+  savedGames: number
   archivedGames: number
   practiceSessions: number
 }
@@ -68,6 +70,7 @@ function summary(
   return {
     exportedAt,
     hasActiveSession: snapshot.session !== null,
+    savedGames: snapshot.sessions.length,
     archivedGames: snapshot.archives.length,
     practiceSessions: snapshot.practice.records.length,
   }
@@ -79,6 +82,7 @@ export async function exportDataBackup(
   const snapshot = await loadStoredDataSnapshot()
   const data: BackupPayload = {
     session: snapshot.session,
+    sessions: snapshot.sessions,
     settings: snapshot.settings,
     stats: snapshot.stats,
     archives: snapshot.archives,
@@ -110,7 +114,7 @@ export function parseDataBackup(serialized: string): {
   if (!isObject(value) || value.format !== DATA_BACKUP_FORMAT) {
     throw new SudokuBackupError('Este arquivo não pertence ao Absolute Sudoku.')
   }
-  if (value.version !== DATA_BACKUP_VERSION) {
+  if (value.version !== 1 && value.version !== DATA_BACKUP_VERSION) {
     throw new SudokuBackupError('Esta versão de backup ainda não é compatível.')
   }
   if (
@@ -132,6 +136,25 @@ export function parseDataBackup(serialized: string): {
   if (value.data.session !== null && session === null) {
     throw new SudokuBackupError('A partida ativa do backup é inválida.')
   }
+  const rawSessions = value.version === 1
+    ? session && session.state.status !== 'completed' ? [session] : []
+    : value.data.sessions
+  if (!Array.isArray(rawSessions)) {
+    throw new SudokuBackupError('A lista de partidas salvas está incompleta.')
+  }
+  const sessions = rawSessions.map(migrateSession)
+  if (sessions.some((entry) => entry === null || entry.state.status === 'completed')) {
+    throw new SudokuBackupError('Uma das partidas salvas está corrompida.')
+  }
+  const validSessions = sessions.filter((entry) => entry !== null)
+  if (new Set(validSessions.map((entry) => entry.id)).size !== validSessions.length) {
+    throw new SudokuBackupError('O backup contém identificadores de partidas repetidos.')
+  }
+  // Older backups only have the active envelope; keep that attempt in the library.
+  if (session && session.state.status !== 'completed' &&
+    !validSessions.some((entry) => entry.id === session.id)) {
+    validSessions.push(session)
+  }
   const rawArchives = Array.isArray(value.data.archives)
     ? value.data.archives
     : []
@@ -144,6 +167,7 @@ export function parseDataBackup(serialized: string): {
   }
   const snapshot: StoredDataSnapshot = {
     session,
+    sessions: validSessions,
     settings: sanitizeSettings(value.data.settings ?? DEFAULT_SETTINGS),
     stats: sanitizeStats(value.data.stats ?? EMPTY_STATS),
     archives,

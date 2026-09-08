@@ -20,6 +20,67 @@ with the relevant implementation details.
   incompatible change requires a schema increment and an explicit migration
   note.
 
+## Unreleased
+
+### Added
+
+- Run lint, unit tests, the production build and Chromium, Firefox, WebKit
+  and mobile browser regressions on GitHub pushes and pull requests. Pin
+  workflow actions to commits and retain diagnostic artifacts on failure.
+- Keep independent in-progress attempts with automatic saving, a lightweight
+  preview index, and a restrained saved-games list accessible from home and
+  the board menu. Preserve notes, colors, selection, hints, undo/redo, event
+  history and active time when switching. No fixed slot limit or automatic
+  eviction of older attempts.
+- Resume an existing daily attempt instead of replacing it, and keep repeated
+  imports independent. Completed attempts move to the archive while other
+  saved games remain available through Continue.
+- Reveal individual deletion through Organize, with inline confirmation,
+  keyboard focus restoration, an empty state and explicit list pagination.
+- Surface a warning if neither IndexedDB nor localStorage can persist progress.
+
+### Compatibility
+
+- Increase `STORAGE_SCHEMA_VERSION` to 4 and IndexedDB to 5. Lazily migrate the
+  original active save and recovery checkpoint into independent attempts.
+  Existing archives, event logs, practice data and puzzle seeds are unchanged.
+- Increase `DATA_BACKUP_VERSION` to 2 to include every saved attempt. Version 1
+  backups still import, with the original active game added to the saved list.
+  Validate the complete collection before replacing data and reject malformed
+  or duplicate attempts. IndexedDB replacement remains transactional.
+
+### Fixed
+
+- Start selection at pointer-down, include the starting cell in drags, and
+  prevent old selections or drags started outside the board from changing
+  unintended cells. Capture and finish mouse, pen and touch gestures, ignore
+  secondary pointers, and tolerate small movements near cell borders.
+- Keep range endpoints and keyboard focus aligned with the actual selection.
+  Keyboard digits and undo/redo remain available after using input tools;
+  key auto-repeat no longer toggles digits or cycles modes repeatedly, and
+  Shift-number shortcuts also work when the keyboard produces punctuation.
+- Keep all keypad digits available for correction, even at nine occurrences,
+  and clamp remaining counts to zero.
+- Respect on-demand and completion-only error display settings.
+- Preserve a synchronous recovery checkpoint when hiding or closing the page,
+  so a rapid reload cannot lose moves still waiting for the debounced IndexedDB
+  write. Restore the newest session and clear checkpoints on data replacement.
+- Restore the completed status when redoing a final move. Do not apply hints
+  while paused or erase an already-correct hinted value; informational hints
+  now close with an actionable acknowledgement.
+
+### Tests
+
+- Add browser regression tests for selection, keyboard and touch input, tools,
+  hints, pause/menu isolation, error policies and session restoration.
+- Add deterministic mixed-action checks across all three variants for input
+  targeting, immutable givens, state immutability and event replay.
+- Add save-library regression coverage for migration, independent attempts,
+  checkpoint recovery, completion, fallback failures and backup round-trips;
+  browser coverage includes switching, clocks, daily resumption, deletion,
+  narrow-screen organization and backup restoration through Settings.
+- Puzzle generation and gameplay event formats remain compatible.
+
 ## [0.5.0] - 2026-08-12
 
 This release completes the local-first archive, focused technique practice,

@@ -211,4 +211,33 @@ describe('game reducer', () => {
     expect(state.elapsedMs).toBe(1_000)
     expect(state.lastResumedAt).toBeNull()
   })
+
+  it('restores completion when redoing the final move', () => {
+    const givens = [...SOLUTION]
+    givens[0] = 0
+    let state = createGameState(puzzleWithGivens(givens), { now: 0 })
+    state = reduceGame(state, gameActions.setDigit(1, 100))
+    state = reduceGame(state, gameActions.undo(200))
+    expect(state.status).toBe('playing')
+    state = reduceGame(state, gameActions.redo(300))
+    expect(state.status).toBe('completed')
+    expect(state.completedAt).toBe(300)
+    expect(state.lastResumedAt).toBeNull()
+  })
+
+  it('does not apply a hint while paused or toggle an already-correct value', () => {
+    let state = createGameState(puzzleWithGivens(), { now: 0 })
+    state = reduceGame(state, gameActions.showHint({
+      technique: 'naked-single', title: 'Single', explanation: 'Place 1',
+      cells: [0], digit: 1,
+    }))
+    state = reduceGame(state, gameActions.setHintPhase(4))
+    const paused = reduceGame(state, gameActions.pause(10))
+    expect(reduceGame(paused, gameActions.applyHint(20)).cells).toEqual(paused.cells)
+    const filled = {
+      ...state,
+      cells: state.cells.map((cell, index) => index === 0 ? { ...cell, value: 1 as const } : cell),
+    }
+    expect(reduceGame(filled, gameActions.applyHint(30)).cells[0]?.value).toBe(1)
+  })
 })

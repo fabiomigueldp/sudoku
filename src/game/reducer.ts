@@ -374,7 +374,8 @@ function restoreSnapshot(
   const source = direction === 'undo' ? state.history : state.future
   const destination = direction === 'undo' ? state.future : state.history
   const remaining = source.slice(0, -1).map(cloneSnapshot)
-  const restoredStatus = state.status === 'paused' ? 'paused' : 'playing'
+  const complete = isBoardComplete({ cells: snapshot.cells, puzzle: state.puzzle })
+  const restoredStatus = complete ? 'completed' : state.status === 'paused' ? 'paused' : 'playing'
   const destinationSnapshots = capSnapshots(
     [...destination, snapshotGame(state)],
     maxHistory,
@@ -387,7 +388,7 @@ function restoreSnapshot(
     mistakes: snapshot.mistakes,
     hintsUsed: snapshot.hintsUsed,
     hint: null,
-    completedAt: null,
+    completedAt: complete ? at : null,
     status: restoredStatus,
     lastResumedAt:
       restoredStatus === 'playing'
@@ -568,12 +569,13 @@ export function reduceGame(
   }
 
   if (action.type === 'hint/apply') {
-    if (state.hint === null || state.hint.phase !== 4) return state
+    if (state.status !== 'playing' || state.hint === null || state.hint.phase !== 4) return state
     const index = action.index ?? state.hint.cells.at(-1)
     const digit = action.digit ?? state.hint.digit
     if (index === undefined || digit === undefined || !isCellIndex(index)) {
       return state
     }
+    if (state.cells[index]?.given || state.cells[index]?.value === digit) return state
     const selectedState: GameState = {
       ...state,
       selected: [index],

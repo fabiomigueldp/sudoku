@@ -194,6 +194,21 @@ Cabeçalhos são baixos, simétricos e previsíveis. Ícones universais podem ap
 
 A tela inicial é uma entrada no instrumento, não uma landing page. A assinatura tipográfica “Absolute Sudoku” é o único título; continuar, desafio diário e novo jogo formam uma coluna central única, plana e delimitada por linhas. Não há hero, manifesto, indicadores permanentes de armazenamento ou conectividade. Estados excepcionais, como uma atualização pronta, só aparecem enquanto exigem uma decisão. Em navegadores móveis compatíveis, instalar a PWA é uma ação terciária abaixo do fluxo de jogo: usa o diálogo nativo quando disponível, revela a instrução mínima exigida pelo iOS de forma inline e desaparece no modo instalado.
 
+### Saved Games
+
+“Continuar” abre a última partida em um toque. A ação “Partidas salvas”, com
+contagem em texto simples, fica agrupada logo abaixo, sem acrescentar controles
+ao tabuleiro. O menu da partida oferece o mesmo acesso. A lista usa separadores,
+prévia discreta da grade, contexto, casas preenchidas, tempo e última atividade;
+o progresso conta somente as casas editáveis, sem revelar se os valores estão
+corretos. Não há slots numerados, badges ou limite arbitrário de partidas.
+
+“Organizar” revela exclusões individuais. A confirmação aparece na própria
+linha, prioriza “Manter partida”, aceita Escape e devolve o foco ao controle
+de origem. Após excluir, o foco permanece na organização. A lista revela mais
+partidas em grupos de 12; nenhuma é removida por antiguidade. Salvamento é
+automático e silencioso, com aviso persistente apenas quando a gravação falha.
+
 ### Sudoku Board
 
 A grade é quadrada, sem radius, com limite externo de 2px, divisões de célula de 1px e divisões 3×3 de 2px. Pistas usam tinta e peso 690; entradas usam azul mineral e peso 530. Seleção tem fundo tonal e contorno interno; a dica usa um marcador tracejado mais interno, para ambos permanecerem legíveis quando coexistem. Conflito tem prioridade cromática, mas nunca apaga seleção, dica ou foco. Candidatos de canto mantêm uma matriz 3×3 estável; marcas centrais fluem em um conjunto compacto sem truncamento. Quando ambos coexistem, a célula separa as duas camadas verticalmente e preserva todos os dígitos. Uma marcação de cor mantém um traço tonal persistente na base da célula, portanto continua reconhecível sob seleção, pares, dicas e conflitos; seu nome também integra o rótulo acessível da célula.

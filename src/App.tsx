@@ -26,18 +26,23 @@ import {
 } from './engine'
 import {
   appendGameEvent,
+  checkpointActiveSession,
   clearAllStoredData,
   createEventLog,
   createGameState,
+  createSessionId,
+  deleteSavedSession,
   EMPTY_PRACTICE_PROGRESS,
   exportDataBackup,
   exportGameSnapshot,
   gameActions,
   importGameSnapshot,
   listArchivedGameSummaries,
+  listSavedGameSummaries,
   loadActiveSession,
   loadArchivedGame,
   loadPracticeProgress,
+  loadSavedSession,
   loadSettings,
   loadStats,
   parseDataBackup,
@@ -47,6 +52,7 @@ import {
   replaySettingsFromGameSettings,
   restoreDataBackup,
   saveActiveSession,
+  savedGameSummary,
   saveGameCompletion,
   saveSettings,
   type ArchivedGameSummary,
@@ -56,6 +62,7 @@ import {
   type GameEventLog,
   type PracticeProgress,
   type ReplaySettings,
+  type SavedGameSummary,
 } from './game'
 import { usePwaInstall } from './pwa/usePwaInstall'
 import { Analysis } from './ui/Analysis'
@@ -64,6 +71,7 @@ import { Home } from './ui/Home'
 import { Library } from './ui/Library'
 import { Practice } from './ui/Practice'
 import { Settings } from './ui/Settings'
+import { SavedGames } from './ui/SavedGames'
 import { Stats } from './ui/Stats'
 
 type Screen =
@@ -74,6 +82,7 @@ type Screen =
   | 'settings'
   | 'stats'
   | 'analysis'
+  | 'saved'
 type UpdateApp = (reloadPage?: boolean) => Promise<void>
 
 interface AnalysisSource {
@@ -186,6 +195,10 @@ export function App() {
   const [practiceProgress, setPracticeProgress] =
     useState<PracticeProgress>(EMPTY_PRACTICE_PROGRESS)
   const [game, setGame] = useState<GameState | null>(null)
+  const [savedGames, setSavedGames] = useState<SavedGameSummary[]>([])
+  const [saveWarning, setSaveWarning] = useState(false)
+  const [sessionError, setSessionError] = useState<string | null>(null)
+  const [openingSession, setOpeningSession] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [generationError, setGenerationError] = useState<string | null>(null)
@@ -203,11 +216,21 @@ export function App() {
   const settingsRef = useRef(settings)
   const gameRef = useRef(game)
   const eventLogRef = useRef<GameEventLog | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
+  const switchingRef = useRef(false)
+  const dailyStartingRef = useRef(false)
   const hydratedRef = useRef(false)
   const generationRef = useRef<AbortController | null>(null)
   const recordedCompletionRef = useRef<string | null>(null)
   const settingsReturnRef = useRef<'home' | 'game'>('home')
+  const savedReturnRef = useRef<'home' | 'game'>('home')
+  const libraryReturnRef = useRef<'home' | 'saved'>('home')
   const resumeAfterSettingsRef = useRef(false)
+  const rangeOriginRef = useRef<{
+    origin: number
+    end: number
+    puzzleId: string
+  } | null>(null)
 
   settingsRef.current = settings
   gameRef.current = game
@@ -276,9 +299,73 @@ export function App() {
 
   const persistCurrentSession = useCallback(() => {
     const current = gameRef.current
-    if (current === null || !hydratedRef.current) return null
-    return saveActiveSession(current, eventLogRef.current)
+    const id = sessionIdRef.current
+    if (current === null || id === null || !hydratedRef.current) return null
+    const savedAt = Date.now()
+    const summary = savedGameSummary(id, current, savedAt)
+    setSavedGames((previous) => {
+      const remaining = previous.filter((entry) => entry.id !== id)
+      return current.status === 'completed' ? remaining : [summary, ...remaining]
+    })
+    return saveActiveSession(current, eventLogRef.current, savedAt, id).then((result) => {
+      setSaveWarning(result.durable === false)
+      return result
+    })
   }, [])
+
+  const checkpointCurrentSession = useCallback(() => {
+    const current = gameRef.current
+    if (current === null || !hydratedRef.current) return
+    if (sessionIdRef.current === null) return
+    checkpointActiveSession(current, eventLogRef.current, Date.now(), sessionIdRef.current)
+    void persistCurrentSession()
+  }, [persistCurrentSession])
+
+  const suspendCurrentSession = useCallback(() => {
+    if (gameRef.current?.status === 'playing') dispatch(gameActions.pause(Date.now()))
+    const current = gameRef.current
+    if (current && sessionIdRef.current) {
+      checkpointActiveSession(current, eventLogRef.current, Date.now(), sessionIdRef.current)
+    }
+    return persistCurrentSession()
+  }, [dispatch, persistCurrentSession])
+
+  const adoptSession = useCallback((state: GameState, log: GameEventLog | null, id: string) => {
+    rangeOriginRef.current = null
+    recordedCompletionRef.current = null
+    sessionIdRef.current = id
+    gameRef.current = state
+    eventLogRef.current = log
+    setGame(state)
+    if (state.status === 'paused') dispatch(gameActions.resume(Date.now()))
+    setChecking(false)
+    setMenuOpen(false)
+    setCopied(false)
+    setSessionError(null)
+    setScreen('game')
+    checkpointCurrentSession()
+  }, [checkpointCurrentSession, dispatch])
+
+  const resumeSavedGame = useCallback(async (id: string) => {
+    if (switchingRef.current) return
+    switchingRef.current = true
+    setOpeningSession(id)
+    setSessionError(null)
+    try {
+      await suspendCurrentSession()
+      const session = await loadSavedSession(id, { now: Date.now() })
+      if (session === null) {
+        setSessionError('Não foi possível abrir esta partida. Tente novamente.')
+        return
+      }
+      adoptSession(session.state, session.eventLog, session.id)
+    } catch {
+      setSessionError('Não foi possível abrir esta partida. Tente novamente.')
+    } finally {
+      switchingRef.current = false
+      setOpeningSession(null)
+    }
+  }, [adoptSession, suspendCurrentSession])
 
   const generateAndStart = useCallback(
     async (
@@ -313,14 +400,9 @@ export function App() {
         const nextLog = createEventLog(puzzle, startedAt, {
           selectFirstEmpty: true,
         })
-        recordedCompletionRef.current = null
-        gameRef.current = nextGame
-        eventLogRef.current = nextLog
-        setGame(nextGame)
-        setChecking(false)
-        setMenuOpen(false)
-        setScreen('game')
-        void saveActiveSession(nextGame, nextLog)
+        await suspendCurrentSession()
+        if (controller.signal.aborted) return
+        adoptSession({ ...nextGame, lastResumedAt: Date.now() }, nextLog, createSessionId())
         if ('storage' in navigator && 'persist' in navigator.storage) {
           void navigator.storage.persist().catch(() => false)
         }
@@ -342,17 +424,22 @@ export function App() {
         }
       }
     },
-    [],
+    [adoptSession, suspendCurrentSession],
   )
 
-  const startDaily = useCallback(() => {
-    const { variant, difficulty } = dailyProfile()
-    void generateAndStart(
-      variant,
-      difficulty,
-      dailySeed(new Date(), variant, difficulty),
-    )
-  }, [generateAndStart])
+  const startDaily = useCallback(async () => {
+    if (generationRef.current || switchingRef.current || dailyStartingRef.current) return
+    dailyStartingRef.current = true
+    try {
+      const { variant, difficulty } = dailyProfile()
+      const seed = dailySeed(new Date(), variant, difficulty)
+      const saved = (await listSavedGameSummaries()).find((entry) => entry.seed === seed)
+      if (saved) await resumeSavedGame(saved.id)
+      else await generateAndStart(variant, difficulty, seed)
+    } finally {
+      dailyStartingRef.current = false
+    }
+  }, [generateAndStart, resumeSavedGame])
 
   const startPractice = useCallback(async (technique: LogicalTechnique) => {
     generationRef.current?.abort()
@@ -382,14 +469,9 @@ export function App() {
       const nextLog = createEventLog(puzzle, startedAt, {
         selectFirstEmpty: true,
       })
-      recordedCompletionRef.current = null
-      gameRef.current = nextGame
-      eventLogRef.current = nextLog
-      setGame(nextGame)
-      setChecking(false)
-      setMenuOpen(false)
-      setScreen('game')
-      void saveActiveSession(nextGame, nextLog)
+      await suspendCurrentSession()
+      if (controller.signal.aborted) return
+      adoptSession({ ...nextGame, lastResumedAt: Date.now() }, nextLog, createSessionId())
       if ('storage' in navigator && 'persist' in navigator.storage) {
         void navigator.storage.persist().catch(() => false)
       }
@@ -405,29 +487,55 @@ export function App() {
         setPracticeGenerating(null)
       }
     }
-  }, [])
+  }, [adoptSession, suspendCurrentSession])
 
   useEffect(() => {
+    let cancelled = false
     void Promise.all([
       loadActiveSession({ now: Date.now() }),
       loadSettings(),
       loadStats(),
       listArchivedGameSummaries(),
       loadPracticeProgress(),
-    ]).then(([
+      listSavedGameSummaries(),
+    ]).then(async ([
       session,
       storedSettings,
       storedStats,
       storedArchives,
       storedPractice,
+      storedSavedGames,
     ]) => {
+      if (cancelled) return
+      // A close immediately after the final digit can leave only the completed
+      // checkpoint. Archive it before choosing another unfinished game.
+      if (session?.state.status === 'completed') {
+        const recovered = await saveGameCompletion(session.state, {
+          sessionId: session.id,
+          eventLog: session.eventLog,
+          replaySettings: replaySettingsFromGameSettings(storedSettings),
+        })
+        storedStats = recovered.stats
+        ;[storedArchives, storedPractice] = await Promise.all([
+          listArchivedGameSummaries(), loadPracticeProgress(),
+        ])
+      }
+      if (cancelled) return
+      const recent = session?.state.status !== 'completed' && session !== null
+        ? session
+        : storedSavedGames[0]
+          ? await loadSavedSession(storedSavedGames[0].id)
+          : session
+      if (cancelled) return
       setSettings(storedSettings)
       setStats(storedStats)
       setArchives(storedArchives)
       setPracticeProgress(storedPractice)
-      gameRef.current = session?.state ?? null
-      eventLogRef.current = session?.eventLog ?? null
-      setGame(session?.state ?? null)
+      sessionIdRef.current = recent?.id ?? null
+      gameRef.current = recent?.state ?? null
+      eventLogRef.current = recent?.eventLog ?? null
+      setGame(recent?.state ?? null)
+      setSavedGames(storedSavedGames)
       hydratedRef.current = true
       setLoading(false)
 
@@ -436,19 +544,21 @@ export function App() {
       window.history.replaceState({}, '', window.location.pathname)
 
       if (intent === 'daily') {
-        const { variant, difficulty } = dailyProfile()
-        void generateAndStart(
-          variant,
-          difficulty,
-          dailySeed(new Date(), variant, difficulty),
-        )
-      } else if (intent === 'resume' && session !== null) {
-        setScreen('game')
+        void suspendCurrentSession()
+        void startDaily()
+      } else if (intent === 'resume' && recent !== null) {
+        adoptSession(recent.state, recent.eventLog, recent.id)
+      } else if (recent?.state.status === 'playing') {
+        // Browsing the home screen is not time spent solving the puzzle.
+        dispatch(gameActions.pause(recent.state.lastResumedAt ?? Date.now()))
       }
     })
 
-    return () => generationRef.current?.abort()
-  }, [generateAndStart])
+    return () => {
+      cancelled = true
+      generationRef.current?.abort()
+    }
+  }, [adoptSession, dispatch, startDaily, suspendCurrentSession])
 
   useEffect(() => {
     const root = document.documentElement
@@ -493,6 +603,7 @@ export function App() {
     recordedCompletionRef.current = completionKey
 
     void saveGameCompletion(game, {
+      ...(sessionIdRef.current ? { sessionId: sessionIdRef.current } : {}),
       eventLog: eventLogRef.current,
       replaySettings: replaySettingsFromGameSettings(settingsRef.current),
     }).then(async (result) => {
@@ -521,7 +632,7 @@ export function App() {
       if (document.visibilityState === 'hidden') {
         resumeWhenVisible = current?.status === 'playing'
         if (resumeWhenVisible) dispatch(gameActions.pause(Date.now()))
-        persistCurrentSession()
+        checkpointCurrentSession()
       } else if (resumeWhenVisible) {
         resumeWhenVisible = false
         dispatch(gameActions.resume(Date.now()))
@@ -530,13 +641,13 @@ export function App() {
     document.addEventListener('visibilitychange', handleVisibility)
     return () =>
       document.removeEventListener('visibilitychange', handleVisibility)
-  }, [dispatch, persistCurrentSession])
+  }, [dispatch, checkpointCurrentSession])
 
   useEffect(() => {
-    const handlePageHide = () => persistCurrentSession()
+    const handlePageHide = () => checkpointCurrentSession()
     window.addEventListener('pagehide', handlePageHide)
     return () => window.removeEventListener('pagehide', handlePageHide)
-  }, [persistCurrentSession])
+  }, [checkpointCurrentSession])
 
   useEffect(() => {
     const handleUpdate = (event: Event) => {
@@ -549,18 +660,53 @@ export function App() {
   }, [])
 
   const goHome = () => {
-    if (game?.status === 'playing') dispatch(gameActions.pause(Date.now()))
+    rangeOriginRef.current = null
+    void suspendCurrentSession()
     setMenuOpen(false)
     setScreen('home')
   }
 
   const continueGame = () => {
-    if (game === null) {
+    const recent = savedGames.find((entry) => entry.id === sessionIdRef.current) ?? savedGames[0]
+    if (!recent) {
       setScreen('library')
       return
     }
-    if (game.status === 'paused') dispatch(gameActions.resume(Date.now()))
-    setScreen('game')
+    void resumeSavedGame(recent.id)
+  }
+
+  const openSavedGames = (from: 'home' | 'game') => {
+    savedReturnRef.current = from
+    void suspendCurrentSession()
+    setMenuOpen(false)
+    setSessionError(null)
+    setScreen('saved')
+  }
+
+  const removeSavedGame = async (id: string) => {
+    const wasCurrent = sessionIdRef.current === id
+    // Pending autosaves/pagehide must not recreate an attempt being deleted.
+    if (wasCurrent) sessionIdRef.current = null
+    try {
+      await deleteSavedSession(id)
+    } catch (error) {
+      if (wasCurrent) sessionIdRef.current = id
+      throw error
+    }
+    if (wasCurrent) {
+      gameRef.current = null
+      eventLogRef.current = null
+      sessionIdRef.current = null
+      setGame(null)
+      savedReturnRef.current = 'home'
+    }
+    setSavedGames((previous) => previous.filter((entry) => entry.id !== id))
+  }
+
+  const openLibrary = (from: 'home' | 'saved') => {
+    libraryReturnRef.current = from
+    setGenerationError(null)
+    setScreen('library')
   }
 
   const openSettings = (from: 'home' | 'game') => {
@@ -591,9 +737,17 @@ export function App() {
     additive: boolean,
     range: boolean,
   ) => {
-    if (range && game !== null && game.anchor >= 0) {
-      const startRow = Math.floor(game.anchor / 9)
-      const startColumn = game.anchor % 9
+    const current = gameRef.current
+    if (current?.status !== 'playing') return
+    if (range && current.anchor >= 0) {
+      const previousRange = rangeOriginRef.current
+      const origin = previousRange?.end === current.anchor &&
+        previousRange.puzzleId === current.puzzle.id
+        ? previousRange.origin
+        : current.anchor
+      rangeOriginRef.current = { origin, end: index, puzzleId: current.puzzle.id }
+      const startRow = Math.floor(origin / 9)
+      const startColumn = origin % 9
       const endRow = Math.floor(index / 9)
       const endColumn = index % 9
       const minRow = Math.min(startRow, endRow)
@@ -603,19 +757,21 @@ export function App() {
 
       const at = Date.now()
       const actions: GameAction[] = [
-        gameActions.select(game.anchor, 'replace', at),
+        gameActions.select(origin, 'replace', at),
       ]
       for (let row = minRow; row <= maxRow; row += 1) {
         for (let column = minColumn; column <= maxColumn; column += 1) {
           const cell = row * 9 + column
-          if (cell === game.anchor) continue
+          if (cell === origin || cell === index) continue
           actions.push(gameActions.select(cell, 'add', at))
         }
       }
+      if (index !== origin) actions.push(gameActions.select(index, 'add', at))
       dispatchMany(actions)
       return
     }
 
+    rangeOriginRef.current = null
     dispatch(
       gameActions.select(index, additive ? 'toggle' : 'replace', Date.now()),
     )
@@ -625,6 +781,8 @@ export function App() {
     direction: 'up' | 'down' | 'left' | 'right' | 'home' | 'end',
     extend: boolean,
   ) => {
+    if (gameRef.current?.status !== 'playing') return
+    rangeOriginRef.current = null
     const anchor = Math.max(0, gameRef.current?.anchor ?? 0)
     const row = Math.floor(anchor / 9)
     const column = anchor % 9
@@ -638,12 +796,6 @@ export function App() {
     if (direction === 'end') target = row * 9 + 8
 
     dispatch(gameActions.select(target, extend ? 'add' : 'replace', Date.now()))
-    window.requestAnimationFrame(() => {
-      const activeCell = document.querySelector<HTMLElement>(
-        '.sudoku-cell[tabindex="0"]',
-      )
-      activeCell?.focus({ preventScroll: true })
-    })
   }
 
   const setDigit = (digit: Digit, mode?: InputMode) => {
@@ -668,7 +820,10 @@ export function App() {
     const current = gameRef.current
     if (current?.hint === null || current === null) return
     if (current.hint.phase === 4) {
-      dispatch(gameActions.applyHint(Date.now()))
+      rangeOriginRef.current = null
+      dispatch(current.hint.digit === undefined
+        ? gameActions.dismissHint(Date.now())
+        : gameActions.applyHint(Date.now()))
       return
     }
     const nextHint = findHint(
@@ -682,16 +837,17 @@ export function App() {
   }
 
   const restart = () => {
+    rangeOriginRef.current = null
     dispatch(gameActions.restart(Date.now()))
     setMenuOpen(false)
     setChecking(false)
   }
 
-  const importValue = (
+  const importValue = async (
     value: string,
     variant: VariantId,
     difficulty: DifficultyId,
-  ) => {
+  ): Promise<string | null> => {
     const normalized = value.trim()
     if (!normalized) return 'Cole uma grade ou um estado compartilhado.'
 
@@ -703,13 +859,10 @@ export function App() {
           lastResumedAt:
             imported.status === 'playing' ? Date.now() : imported.lastResumedAt,
         }
-        recordedCompletionRef.current = null
-        gameRef.current = resumed
-        eventLogRef.current = null
-        setGame(resumed)
-        setScreen('game')
+        await suspendCurrentSession()
+        generationRef.current?.abort()
+        adoptSession(resumed, null, createSessionId())
         setGenerationError(null)
-        void saveActiveSession(resumed, null)
         return null
       } catch (error) {
         return error instanceof Error
@@ -728,13 +881,10 @@ export function App() {
       const importedLog = createEventLog(puzzle, startedAt, {
         selectFirstEmpty: true,
       })
-      recordedCompletionRef.current = null
-      gameRef.current = importedGame
-      eventLogRef.current = importedLog
-      setGame(importedGame)
-      setScreen('game')
+      await suspendCurrentSession()
+      generationRef.current?.abort()
+      adoptSession(importedGame, importedLog, createSessionId())
       setGenerationError(null)
-      void saveActiveSession(importedGame, importedLog)
       return null
     } catch (error) {
       return error instanceof Error
@@ -776,41 +926,61 @@ export function App() {
   const restoreAllData = async (
     serialized: string,
   ): Promise<BackupRestoreResult> => {
-    const result = await restoreDataBackup(serialized)
-    const [session, storedSettings, storedStats, storedArchives, storedPractice] =
-      await Promise.all([
-        loadActiveSession({ now: Date.now() }),
-        loadSettings(),
-        loadStats(),
-        listArchivedGameSummaries(),
-        loadPracticeProgress(),
-      ])
-    settingsRef.current = storedSettings
-    gameRef.current = session?.state ?? null
-    eventLogRef.current = session?.eventLog ?? null
-    recordedCompletionRef.current = null
-    setSettings(storedSettings)
-    setStats(storedStats)
-    setArchives(storedArchives)
-    setPracticeProgress(storedPractice)
-    setGame(session?.state ?? null)
-    setAnalysisSource(null)
-    return result
+    hydratedRef.current = false
+    try {
+      const result = await restoreDataBackup(serialized)
+      const [session, storedSettings, storedStats, storedArchives, storedPractice, storedSavedGames] =
+        await Promise.all([
+          loadActiveSession({ now: Date.now() }),
+          loadSettings(),
+          loadStats(),
+          listArchivedGameSummaries(),
+          loadPracticeProgress(),
+          listSavedGameSummaries(),
+        ])
+      settingsRef.current = storedSettings
+      gameRef.current = session?.state ?? null
+      eventLogRef.current = session?.eventLog ?? null
+      sessionIdRef.current = session?.id ?? null
+      recordedCompletionRef.current = null
+      setSettings(storedSettings)
+      setStats(storedStats)
+      setArchives(storedArchives)
+      setPracticeProgress(storedPractice)
+      setSavedGames(storedSavedGames)
+      setSaveWarning(result.storage.durable === false)
+      if (gameRef.current?.status === 'playing') {
+        dispatch(gameActions.pause(gameRef.current.lastResumedAt ?? Date.now()))
+      }
+      setGame(gameRef.current)
+      setAnalysisSource(null)
+      return result
+    } finally {
+      hydratedRef.current = true
+    }
   }
 
   const clearAllData = async (): Promise<void> => {
-    await clearAllStoredData()
-    settingsRef.current = DEFAULT_SETTINGS
-    gameRef.current = null
-    eventLogRef.current = null
-    recordedCompletionRef.current = null
-    setSettings(DEFAULT_SETTINGS)
-    setStats(EMPTY_STATS)
-    setArchives([])
-    setPracticeProgress(EMPTY_PRACTICE_PROGRESS)
-    setGame(null)
-    setAnalysisSource(null)
-    setScreen('home')
+    hydratedRef.current = false
+    try {
+      await clearAllStoredData()
+      settingsRef.current = DEFAULT_SETTINGS
+      gameRef.current = null
+      eventLogRef.current = null
+      sessionIdRef.current = null
+      recordedCompletionRef.current = null
+      setSettings(DEFAULT_SETTINGS)
+      setStats(EMPTY_STATS)
+      setArchives([])
+      setPracticeProgress(EMPTY_PRACTICE_PROGRESS)
+      setGame(null)
+      setSavedGames([])
+      setSaveWarning(false)
+      setAnalysisSource(null)
+      setScreen('home')
+    } finally {
+      hydratedRef.current = true
+    }
   }
 
   const openCurrentAnalysis = () => {
@@ -847,15 +1017,24 @@ export function App() {
       data-reduce-motion={settings.reduceMotion}
       data-high-contrast={settings.highContrast}
     >
+      {saveWarning && (
+        <p className="save-warning" role="alert">
+          O navegador não conseguiu salvar suas alterações. Mantenha o app aberto e exporte um backup em Ajustes → Dados.
+        </p>
+      )}
       {screen === 'home' && (
         <Home
-          session={game}
+          session={savedGames.find((entry) => entry.id === sessionIdRef.current) ?? savedGames[0] ?? null}
+          savedCount={savedGames.length}
+          busy={generating || openingSession !== null}
+          error={sessionError}
+          onSaved={() => openSavedGames('home')}
           install={pwaInstall}
           updateReady={updateApp !== null}
           onUpdate={() => void updateApp?.(true)}
           onContinue={continueGame}
-          onDaily={startDaily}
-          onNew={() => setScreen('library')}
+          onDaily={() => void startDaily()}
+          onNew={() => openLibrary('home')}
           onStats={() => setScreen('stats')}
           onSettings={() => openSettings('home')}
         />
@@ -866,8 +1045,14 @@ export function App() {
           <Library
             generating={generating}
             error={generationError}
-            onBack={() => setScreen('home')}
-            onPractice={() => setScreen('practice')}
+            onBack={() => {
+              generationRef.current?.abort()
+              setScreen(libraryReturnRef.current)
+            }}
+            onPractice={() => {
+              generationRef.current?.abort()
+              setScreen('practice')
+            }}
             onImport={importValue}
             onStart={(variant, difficulty) =>
               void generateAndStart(
@@ -880,12 +1065,30 @@ export function App() {
         </>
       )}
 
+      {screen === 'saved' && (
+        <SavedGames
+          sessions={savedGames}
+          openingId={openingSession}
+          error={sessionError}
+          onOpen={(id) => void resumeSavedGame(id)}
+          onDelete={removeSavedGame}
+          onNew={() => openLibrary('saved')}
+          onBack={() => {
+            if (savedReturnRef.current === 'game' && gameRef.current !== null) continueGame()
+            else setScreen('home')
+          }}
+        />
+      )}
+
       {screen === 'practice' && (
         <Practice
           progress={practiceProgress}
           generating={practiceGenerating}
           error={practiceError}
-          onBack={() => setScreen('library')}
+          onBack={() => {
+            generationRef.current?.abort()
+            setScreen('library')
+          }}
           onStart={(technique) => void startPractice(technique)}
         />
       )}
@@ -944,9 +1147,11 @@ export function App() {
             )
           }
           onSelect={selectCell}
-          onDragSelect={(index) =>
+          onDragSelect={(index) => {
+            if (gameRef.current?.status !== 'playing') return
+            rangeOriginRef.current = null
             dispatch(gameActions.select(index, 'add', Date.now()))
-          }
+          }}
           onMoveSelection={moveSelection}
           onMode={(mode: InputMode) =>
             dispatch(gameActions.setMode(mode, Date.now()))
@@ -968,6 +1173,7 @@ export function App() {
           }}
           onRestart={restart}
           onSettings={() => openSettings('game')}
+          onSaved={() => openSavedGames('game')}
           onCopy={copyCurrentState}
           copied={copied}
           onNew={() =>

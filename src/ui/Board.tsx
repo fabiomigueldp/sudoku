@@ -1,4 +1,4 @@
-import { memo, useMemo } from 'react'
+import { memo, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import type {
   CellState,
   Digit,
@@ -21,7 +21,6 @@ interface BoardProps {
   readOnly?: boolean
   onSelect: (index: number, additive: boolean, range: boolean) => void
   onDragSelect: (index: number) => void
-  onKeyDown: (event: React.KeyboardEvent<HTMLButtonElement>) => void
 }
 
 function cellLabel(
@@ -48,6 +47,7 @@ const Cell = memo(function Cell({
   index,
   selected,
   isAnchor,
+  tabStop,
   matched,
   peer,
   conflict,
@@ -55,13 +55,12 @@ const Cell = memo(function Cell({
   diagonal,
   readOnly,
   onSelect,
-  onDragSelect,
-  onKeyDown,
 }: {
   cell: CellState
   index: number
   selected: boolean
   isAnchor: boolean
+  tabStop: boolean
   matched: boolean
   peer: boolean
   conflict: boolean
@@ -69,8 +68,6 @@ const Cell = memo(function Cell({
   diagonal: boolean
   readOnly: boolean
   onSelect: BoardProps['onSelect']
-  onDragSelect: BoardProps['onDragSelect']
-  onKeyDown: BoardProps['onKeyDown']
 }) {
   return (
     <button
@@ -88,6 +85,7 @@ const Cell = memo(function Cell({
         .filter(Boolean)
         .join(' ')}
       data-selected={selected || undefined}
+      data-cell-index={index}
       data-anchor={isAnchor || undefined}
       data-given={cell.given || undefined}
       data-match={matched || undefined}
@@ -111,25 +109,21 @@ const Cell = memo(function Cell({
       aria-invalid={conflict || undefined}
       aria-rowindex={Math.floor(index / 9) + 1}
       aria-colindex={(index % 9) + 1}
-      tabIndex={!readOnly && isAnchor ? 0 : -1}
+      tabIndex={!readOnly && tabStop ? 0 : -1}
       onClick={
         readOnly
           ? undefined
-          : (event) =>
+          : (event) => {
+              // Pointer gestures select at pointerdown. Keep synthetic clicks
+              // available for keyboards and assistive technology.
+              if (event.detail !== 0) return
               onSelect(
                 index,
                 event.ctrlKey || event.metaKey,
                 event.shiftKey,
               )
-      }
-      onPointerEnter={
-        readOnly
-          ? undefined
-          : (event) => {
-              if (event.buttons === 1) onDragSelect(index)
             }
       }
-      onKeyDown={readOnly ? undefined : onKeyDown}
     >
       {cell.value ? (
         <span className="cell-value">{cell.value}</span>
@@ -173,8 +167,86 @@ export function Board({
   readOnly = false,
   onSelect,
   onDragSelect,
-  onKeyDown,
 }: BoardProps) {
+  const boardRef = useRef<HTMLDivElement>(null)
+  const gestureRef = useRef<{
+    pointerId: number
+    startX: number
+    startY: number
+    dragging: boolean
+    visited: Set<number>
+  } | null>(null)
+
+  useEffect(() => {
+    const cancel = () => {
+      gestureRef.current = null
+    }
+    window.addEventListener('blur', cancel)
+    document.addEventListener('visibilitychange', cancel)
+    return () => {
+      window.removeEventListener('blur', cancel)
+      document.removeEventListener('visibilitychange', cancel)
+    }
+  }, [])
+
+  useLayoutEffect(() => {
+    if (readOnly) gestureRef.current = null
+    const board = boardRef.current
+    if (!readOnly && board?.contains(document.activeElement)) {
+      board.querySelector<HTMLElement>('[tabindex="0"]')?.focus({ preventScroll: true })
+    }
+  }, [anchor, readOnly])
+
+  const pointerCell = (target: EventTarget | null) => {
+    const cell = target instanceof Element
+      ? target.closest<HTMLElement>('[data-cell-index]')
+      : null
+    return cell && boardRef.current?.contains(cell) ? cell : null
+  }
+
+  const startGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (readOnly || !event.isPrimary || event.button !== 0 || gestureRef.current) return
+    const cell = pointerCell(event.target)
+    if (!cell) return
+    const index = Number(cell.dataset.cellIndex)
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    gestureRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: false,
+      visited: new Set([index]),
+    }
+    cell.focus({ preventScroll: true })
+    onSelect(index, event.ctrlKey || event.metaKey, event.shiftKey)
+  }
+
+  const moveGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const gesture = gestureRef.current
+    if (readOnly || gesture?.pointerId !== event.pointerId) return
+    if (event.buttons !== 1) {
+      gestureRef.current = null
+      return
+    }
+    // A small tremor near a cell edge must not become a multi-cell gesture.
+    if (!gesture.dragging && Math.hypot(
+      event.clientX - gesture.startX,
+      event.clientY - gesture.startY,
+    ) < 6) return
+    gesture.dragging = true
+    const cell = pointerCell(document.elementFromPoint(event.clientX, event.clientY))
+    if (!cell) return
+    const index = Number(cell.dataset.cellIndex)
+    if (gesture.visited.has(index)) return
+    gesture.visited.add(index)
+    onDragSelect(index)
+  }
+
+  const endGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (gestureRef.current?.pointerId === event.pointerId) gestureRef.current = null
+  }
+
   const selectedSet = useMemo(() => new Set(selected), [selected])
   const hinted = useMemo(() => new Set(hint?.cells ?? []), [hint])
   const anchorValue = cells[anchor]?.value ?? activeDigit
@@ -186,11 +258,17 @@ export function Board({
       aria-label={`Sudoku ${puzzle.variant}, dificuldade ${puzzle.difficulty}`}
     >
       <div
+        ref={boardRef}
         className="sudoku-board"
         role="grid"
         aria-readonly={readOnly || undefined}
         aria-rowcount={9}
         aria-colcount={9}
+        onPointerDown={startGesture}
+        onPointerMove={moveGesture}
+        onPointerUp={endGesture}
+        onPointerCancel={endGesture}
+        onLostPointerCapture={endGesture}
       >
         {Array.from({ length: 9 }, (_, row) => (
           <div role="row" className="board-row" key={row}>
@@ -206,6 +284,7 @@ export function Board({
                   index={index}
                   selected={selectedSet.has(index)}
                   isAnchor={index === anchor}
+                  tabStop={index === (anchor >= 0 ? anchor : 0)}
                   matched={
                     settings.highlightMatches &&
                     anchorValue !== null &&
@@ -221,8 +300,6 @@ export function Board({
                   diagonal={isDiagonal}
                   readOnly={readOnly}
                   onSelect={onSelect}
-                  onDragSelect={onDragSelect}
-                  onKeyDown={onKeyDown}
                 />
               )
             })}

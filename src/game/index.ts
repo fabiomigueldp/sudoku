@@ -96,8 +96,13 @@ export {
 
 export {
   STORAGE_SCHEMA_VERSION,
+  checkpointActiveSession,
   clearAllStoredData,
   clearActiveSession,
+  deleteSavedSession,
+  listSavedGameSummaries,
+  listSavedSessions,
+  loadSavedSession,
   listArchivedGames,
   listArchivedGameSummaries,
   loadActiveSession,
@@ -125,6 +130,12 @@ export {
   type StorageBackend,
   type StorageWriteResult,
 } from './persistence'
+
+export {
+  createSessionId,
+  savedGameSummary,
+  type SavedGameSummary,
+} from './sessions'
 
 export {
   DATA_BACKUP_FORMAT,
