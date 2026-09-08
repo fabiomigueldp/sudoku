@@ -66,7 +66,7 @@ export {
   type WorkerGenerationOptions,
 } from './generatorClient'
 
-export { dailySeed, localDateKey } from './daily'
+export { DAILY_SCHEDULE, dailyProfile, dailySeed, localDateKey, matchesDailySeed } from './daily'
 export { findHint } from './hints'
 export {
   PRACTICE_TECHNIQUES,

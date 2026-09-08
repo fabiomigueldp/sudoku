@@ -1,6 +1,19 @@
 import type { DifficultyId, VariantId } from '../domain/types'
 import { GENERATOR_VERSION } from './generator'
 
+export const DAILY_SCHEDULE: ReadonlyArray<{
+  variant: VariantId
+  difficulty: DifficultyId
+}> = [
+  { variant: 'classic', difficulty: 'focused' },
+  { variant: 'classic', difficulty: 'challenging' },
+  { variant: 'diagonal', difficulty: 'focused' },
+  { variant: 'classic', difficulty: 'expert' },
+  { variant: 'anti-knight', difficulty: 'focused' },
+  { variant: 'diagonal', difficulty: 'challenging' },
+  { variant: 'classic', difficulty: 'master' },
+]
+
 function pad2(value: number): string {
   return String(value).padStart(2, '0')
 }
@@ -47,4 +60,21 @@ export function dailySeed(
   difficulty: DifficultyId = 'focused',
 ): string {
   return `absolute-sudoku:daily:v2:g${GENERATOR_VERSION}:${normalizeDateKey(date)}:${variant}:${difficulty}`
+}
+
+export function dailyProfile(date: Date | string = new Date()) {
+  const ordinal = Math.floor(Date.parse(`${normalizeDateKey(date)}T00:00:00Z`) / 86_400_000)
+  const index = ((ordinal % DAILY_SCHEDULE.length) + DAILY_SCHEDULE.length) % DAILY_SCHEDULE.length
+  return DAILY_SCHEDULE[index]!
+}
+
+/** A saved daily remains today's attempt across generator upgrades. */
+export function matchesDailySeed(
+  seed: string,
+  date: Date | string,
+  variant: VariantId,
+  difficulty: DifficultyId,
+): boolean {
+  const match = /^absolute-sudoku:daily:v2:g\d+:(.+)$/.exec(seed)
+  return match?.[1] === `${normalizeDateKey(date)}:${variant}:${difficulty}`
 }

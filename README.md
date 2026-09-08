@@ -21,7 +21,7 @@ geração devem incrementar `GENERATOR_VERSION`; alterações incompatíveis no
 event log, no arquivo, na prática ou no backup devem atualizar seus respectivos
 schemas e documentar a migração.
 
-Marcadores atuais: `GENERATOR_VERSION = 3`, `EVENT_LOG_VERSION = 1`,
+Marcadores atuais: `GENERATOR_VERSION = 4`, `EVENT_LOG_VERSION = 1`,
 `STORAGE_SCHEMA_VERSION = 4`, `ARCHIVED_GAME_VERSION = 1`,
 `PRACTICE_VERSION = 1`, `PRACTICE_PROGRESS_VERSION = 1` e
 `DATA_BACKUP_VERSION = 2`. Saves anteriores e backups v1 migram automaticamente.

@@ -22,6 +22,25 @@ with the relevant implementation details.
 
 ## Unreleased
 
+### Daily generation recovery
+
+- Fix the September 8, 2026 diagonal/challenging daily, whose v3 seed exhausted
+  all 56 search attempts without a sufficiently difficult puzzle. Exhaustion
+  now uses a bounded, deterministic transformation of validated reserve grids
+  covering every daily profile. Recheck logical difficulty before accepting a
+  transformed board; keep the rated original as the final fallback. Uniqueness,
+  variant constraints, clue ranges and rotational symmetry are preserved.
+- Increment `GENERATOR_VERSION` to 4 for the new recovery behavior and generated
+  identities. Retain the v3 carving stream for successful explicit seeds and
+  targeted practice generation. Existing boards and replay logs need no migration.
+- Resume a saved daily by calendar date and mode across generator versions,
+  preserving its original grid and progress. Derive the schedule and seed from
+  the same captured local date, including around midnight. Daily failures no
+  longer ask the player to choose a different seed or difficulty.
+- Add the exact failing-seed regression, reserve validation for every daily
+  profile, a two-week calendar sweep and browser tests using the real worker
+  and a daily saved before the generator upgrade.
+
 ### Added
 
 - Offer an explicit automatic finish for the last 1–10 empty cells only when

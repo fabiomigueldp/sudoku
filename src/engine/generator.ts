@@ -11,10 +11,14 @@ import {
   type LogicalTechnique,
 } from './analyzer'
 import { createSeededRandom, hashSeed } from './random'
+import { reserveCandidates } from './generationReserves'
 import { countSolutions, solve } from './solver'
 import { CELL_COUNT } from './topology'
 
-export const GENERATOR_VERSION = 3
+export const GENERATOR_VERSION = 4
+// Keep successful carving results for existing explicit seeds. Version 4 adds
+// deterministic recovery after exhaustion; it does not reshuffle the search.
+const CARVING_VERSION = 3
 
 export interface DifficultyProfile {
   readonly targetClues: number
@@ -351,7 +355,7 @@ export function generatePuzzle(
     : profile.attempts * 2
   for (let attempt = 0; attempt < attemptLimit; attempt += 1) {
     const random = createSeededRandom(
-      `absolute-sudoku:generation:v${GENERATOR_VERSION}:${options.seed}:${options.variant}:${options.difficulty}:${attempt}`,
+      `absolute-sudoku:generation:v${CARVING_VERSION}:${options.seed}:${options.variant}:${options.difficulty}:${attempt}`,
     )
     const solution = solve(new Array<number>(CELL_COUNT).fill(0), options.variant, {
       random,
@@ -402,6 +406,20 @@ export function generatePuzzle(
       (options.targetTechnique === undefined ? 2 : 1)
     ) {
       break
+    }
+  }
+
+  if (bestCandidate === null && options.targetTechnique === undefined) {
+    for (const grids of reserveCandidates(options.seed, options.variant, options.difficulty)) {
+      const candidate: RatedCandidate = {
+        ...grids,
+        analysis: analyzeDifficulty(grids.givens, options.variant),
+        attempt: attemptLimit,
+      }
+      if (candidateMatchesProfile(candidate, options.difficulty)) {
+        bestCandidate = candidate
+        break
+      }
     }
   }
 

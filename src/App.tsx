@@ -17,6 +17,8 @@ import type {
 } from './domain/types'
 import {
   dailySeed,
+  dailyProfile,
+  matchesDailySeed,
   findHint,
   GENERATOR_VERSION,
   generatePracticePuzzleInWorker,
@@ -154,26 +156,6 @@ function randomSeed(variant: VariantId, difficulty: DifficultyId) {
       ? crypto.randomUUID()
       : `${Date.now()}-${Math.random().toString(36).slice(2)}`
   return `absolute-sudoku:free:v2:g${GENERATOR_VERSION}:${variant}:${difficulty}:${entropy}`
-}
-
-const DAILY_SCHEDULE: ReadonlyArray<{
-  variant: VariantId
-  difficulty: DifficultyId
-}> = [
-  { variant: 'classic', difficulty: 'focused' },
-  { variant: 'classic', difficulty: 'challenging' },
-  { variant: 'diagonal', difficulty: 'focused' },
-  { variant: 'classic', difficulty: 'expert' },
-  { variant: 'anti-knight', difficulty: 'focused' },
-  { variant: 'diagonal', difficulty: 'challenging' },
-  { variant: 'classic', difficulty: 'master' },
-]
-
-function dailyProfile(date = new Date()) {
-  const ordinal = Math.floor(
-    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000,
-  )
-  return DAILY_SCHEDULE[ordinal % DAILY_SCHEDULE.length]!
 }
 
 function LoadingScreen() {
@@ -414,7 +396,9 @@ export function App() {
           return
         }
         setGenerationError(
-          'Não foi possível construir esta grade. Tente outra seed ou intensidade.',
+          seed.startsWith('absolute-sudoku:daily:')
+            ? 'Não foi possível abrir o desafio diário. Tente novamente.'
+            : 'Não foi possível construir esta grade. Tente outra seed ou intensidade.',
         )
         setScreen('library')
       } finally {
@@ -431,9 +415,12 @@ export function App() {
     if (generationRef.current || switchingRef.current || dailyStartingRef.current) return
     dailyStartingRef.current = true
     try {
-      const { variant, difficulty } = dailyProfile()
-      const seed = dailySeed(new Date(), variant, difficulty)
-      const saved = (await listSavedGameSummaries()).find((entry) => entry.seed === seed)
+      const date = new Date()
+      const { variant, difficulty } = dailyProfile(date)
+      const seed = dailySeed(date, variant, difficulty)
+      const saved = (await listSavedGameSummaries()).find((entry) =>
+        matchesDailySeed(entry.seed, date, variant, difficulty),
+      )
       if (saved) await resumeSavedGame(saved.id)
       else await generateAndStart(variant, difficulty, seed)
     } finally {
