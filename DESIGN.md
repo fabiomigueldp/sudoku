@@ -217,7 +217,17 @@ A grade é quadrada, sem radius, com limite externo de 2px, divisões de célula
 
 Modo, números e ações formam uma única sequência vertical no desktop e compacta no mobile. Número, canto, centro e cor são modos mutuamente exclusivos. A paleta de cor indica a marca ativa por forma e estado pressionado, e um segundo acionamento remove a mesma cor da seleção. Apagar atua somente sobre a camada do modo atual. Contagem restante é texto pequeno integrado, nunca badge.
 
+### Automatic Finish
+
+A conclusão automática aparece abaixo dos controles somente nas últimas dez
+casas quando o restante pode ser deduzido por singles. O botão informa quantas
+casas preencherá; uma frase explica a assistência e a possibilidade de desfazer.
+Sua aparição não desloca o tabuleiro. A tela pode rolar em alturas pequenas para
+manter o controle alcançável. Não há preenchimento sem ação explícita nem
+animação que atrase a conclusão. Uma dica aberta tem prioridade sobre a oferta.
+
 ### Practice
+
 
 A prática é uma biblioteca de padrões, não uma trilha gamificada. Técnicas são agrupadas por família em listas planas, com nome, uma frase de reconhecimento e histórico discreto. Não há níveis bloqueados, pontuações ou pressão por sequência. Ao entrar numa grade, o contexto “Prática · técnica” substitui o rótulo de dificuldade e permanece consistente até a conclusão e a análise.
 

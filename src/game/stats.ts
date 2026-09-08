@@ -140,8 +140,15 @@ export function addGameRecord(
   record: GameRecord,
   dailyDate: string | null = null,
 ): PlayerStats {
-  if (stats.records.some((existing) => existing.id === record.id)) {
-    return cloneStats(stats)
+  const existing = stats.records.find((entry) => entry.id === record.id)
+  if (existing) {
+    const clean = (entry: GameRecord) => entry.mistakes === 0 && entry.hintsUsed === 0 ? 1 : 0
+    return {
+      ...cloneStats(stats),
+      cleanSolves: stats.cleanSolves - clean(existing) + clean(record),
+      totalTimeMs: stats.totalTimeMs - existing.elapsedMs + Math.max(0, record.elapsedMs),
+      records: stats.records.map((entry) => cloneRecord(entry.id === record.id ? record : entry)),
+    }
   }
 
   const streak = nextStreak(stats, dailyDate)

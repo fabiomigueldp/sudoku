@@ -24,6 +24,15 @@ with the relevant implementation details.
 
 ### Added
 
+- Offer an explicit automatic finish for the last 1–10 empty cells only when
+  naked and hidden singles prove the entire remaining solution. Revalidate on
+  activation, preserve existing entries and colors, count one hint, and record
+  one reversible action with a named assistance moment in replay. Add undo to
+  the completion screen. Existing saves and puzzle generation remain compatible.
+- Update a completed attempt's statistics and archive on re-completion instead
+  of counting undo/redo as another game. Preserve legacy completion identities
+  during checkpoint recovery.
+
 - Run lint, unit tests, the production build and Chromium, Firefox, WebKit
   and mobile browser regressions on GitHub pushes and pull requests. Pin
   workflow actions to commits and retain diagnostic artifacts on failure.

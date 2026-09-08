@@ -47,6 +47,7 @@ const REVIEWED_ACTIONS = new Set<GameAction['type']>([
   'history/redo',
   'hint/show',
   'hint/apply',
+  'game/auto-finish',
   'game/restart',
 ])
 
@@ -170,7 +171,7 @@ function assessmentFor(
   delta: ReviewDelta,
   logicalStep: LogicalStep | null,
 ): ReviewAssessment {
-  if (action.type === 'hint/show' || action.type === 'hint/apply') {
+  if (action.type === 'hint/show' || action.type === 'hint/apply' || action.type === 'game/auto-finish') {
     return 'assistance'
   }
   if (

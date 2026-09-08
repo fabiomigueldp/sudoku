@@ -10,6 +10,7 @@ import type {
 import { DIGIT_COLOR_MAP } from '../domain/catalog'
 import { peersFor } from '../engine'
 import { advanceClock, pauseAt, resumeAt } from './clock'
+import { planAutoFinish } from './autoFinish'
 import {
   capSnapshots,
   cloneCells,
@@ -73,6 +74,7 @@ export type GameAction =
       digit?: Digit
     })
   | (TimestampedAction & { type: 'game/complete'; force?: boolean })
+  | (TimestampedAction & { type: 'game/auto-finish' })
   | (TimestampedAction & { type: 'game/restart'; startPaused?: boolean })
 
 export interface GameReducerOptions {
@@ -589,6 +591,26 @@ export function reduceGame(
     }
     if (at !== null) digitAction.at = at
     return applyValue(selectedState, digitAction, options)
+  }
+
+  if (action.type === 'game/auto-finish') {
+    const placements = planAutoFinish(state)
+    if (placements === null) return state
+    const cells = cloneCells(state.cells)
+    for (const { index, digit } of placements) {
+      const cell = cells[index]!
+      cell.value = digit
+      cell.corner = []
+      cell.center = []
+    }
+    return withHistory(state, {
+      cells,
+      hintsUsed: state.hintsUsed + 1,
+      hint: null,
+      status: 'completed',
+      completedAt: at,
+      lastResumedAt: null,
+    }, options.maxHistory)
   }
 
   if (action.type === 'game/complete') {

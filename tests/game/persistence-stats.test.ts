@@ -133,4 +133,23 @@ describe('game persistence and statistics', () => {
     })
     expect(duplicate.stats.completed).toBe(1)
   })
+
+  it('updates the same attempt after undo and a manual finish without duplicating statistics', async () => {
+    const givens = [...SOLUTION]
+    givens[0] = 0
+    const initial = createGameState(puzzleWithGivens(givens), { now: 0 })
+    const auto = reduceGame(initial, { type: 'game/auto-finish', at: 1000 })
+    const first = await saveGameCompletion(auto, { sessionId: 'attempt-a' })
+    expect(first.stats.cleanSolves).toBe(0)
+    const undone = reduceGame(auto, gameActions.undo(2000))
+    const manual = reduceGame(undone, gameActions.setDigit(SOLUTION[0] as 1, 4000))
+    const second = await saveGameCompletion(manual, { sessionId: 'attempt-a' })
+    expect(second.stats.completed).toBe(1)
+    expect(second.stats.cleanSolves).toBe(1)
+    expect(second.stats.totalTimeMs).toBe(3000)
+    expect(second.stats.records).toHaveLength(1)
+    expect(second.stats.records[0]!.hintsUsed).toBe(0)
+    const another = await saveGameCompletion(manual, { sessionId: 'attempt-b' })
+    expect(another.stats.completed).toBe(2)
+  })
 })

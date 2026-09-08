@@ -24,6 +24,43 @@ async function start(
 const cell = (page: Page, index: number) => page.getByRole('gridcell').nth(index)
 const digit = (page: Page, value: number) => page.locator('.number-key').nth(value - 1)
 
+test('automatic finish is optional, accessible, reversible and survives reload', async ({ page }) => {
+  const state = createGameState(puzzleWithGivens(SOLUTION.map((value, index) => index < 10 ? 0 : value)), { now: Date.now() })
+  await start(page, state)
+  const finish = page.getByRole('button', { name: 'Concluir as 10 casas restantes' })
+  await expect(finish).toBeVisible()
+  await expect(cell(page, 0)).toHaveAttribute('aria-label', /vazia/)
+  await finish.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog', { name: 'Grade concluída' })).toBeVisible()
+  await page.getByRole('button', { name: 'Desfazer conclusão' }).click()
+  await expect(finish).toBeVisible()
+  await expect(cell(page, 0)).toHaveAttribute('aria-label', /vazia/)
+  await page.reload()
+  await page.getByRole('button', { name: /^Continuar / }).click()
+  await expect(finish).toBeVisible()
+  await finish.click()
+  await expect(page.getByRole('dialog', { name: 'Grade concluída' })).toBeVisible()
+})
+
+test('automatic finish keeps the board stable and remains reachable on a narrow screen', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  const state = createGameState(puzzleWithGivens(SOLUTION.map((value, index) => index < 11 ? 0 : value)), { now: Date.now() })
+  await start(page, state, { theme: 'dark', highContrast: true, reduceMotion: true })
+  const before = await page.getByRole('grid').boundingBox()
+  await cell(page, 10).click()
+  await digit(page, SOLUTION[10]!).click()
+  expect(await page.getByRole('grid').boundingBox()).toEqual(before)
+  const finish = page.getByRole('button', { name: 'Concluir as 10 casas restantes' })
+  await finish.scrollIntoViewIfNeeded()
+  await expect(finish).toBeInViewport()
+  await expect(page.locator('#auto-finish-description')).toBeInViewport()
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath('auto-finish-narrow.png') })
+  await finish.click()
+  await expect(page.getByRole('dialog', { name: 'Grade concluída' })).toBeVisible()
+})
+
 const browserErrors = new WeakMap<Page, string[]>()
 test.beforeEach(({ page }) => {
   const errors: string[] = []

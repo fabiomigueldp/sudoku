@@ -1135,7 +1135,7 @@ export async function saveGameCompletion(
   const record = createGameRecord(
     state,
     options.completedAt ?? state.completedAt,
-    options.recordId,
+    options.recordId ?? options.sessionId,
   )
   const dailyDate =
     options.dailyDate === undefined
@@ -1166,6 +1166,7 @@ export async function saveGameCompletion(
     id: record.id,
   }
   const practiceRecord = createPracticeRecord(state)
+  if (practiceRecord !== null) practiceRecord.id = record.id
   const completedSession: PersistedGameSession = {
     id: options.sessionId ?? legacySessionId(state, options.eventLog ?? null),
     schemaVersion: STORAGE_SCHEMA_VERSION,

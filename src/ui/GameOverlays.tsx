@@ -364,12 +364,14 @@ export function CompletionOverlay({
   onHome,
   onAgain,
   onAnalyze,
+  onUndo,
 }: {
   game: GameState
   contextLabel?: string | undefined
   onHome: () => void
   onAgain: () => void
   onAnalyze?: (() => void) | undefined
+  onUndo?: (() => void) | undefined
 }) {
   const layerRef = useRef<HTMLElement>(null)
   const announcementRef = useRef<HTMLParagraphElement>(null)
@@ -429,6 +431,11 @@ export function CompletionOverlay({
         <button type="button" className="secondary-action" onClick={onHome}>
           Voltar ao início
         </button>
+        {onUndo && (
+          <button type="button" className="secondary-action" onClick={onUndo}>
+            Desfazer conclusão
+          </button>
+        )}
       </div>
     </section>
   )

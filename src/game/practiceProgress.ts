@@ -52,7 +52,7 @@ export function addPracticeRecord(
   if (progress.records.some((existing) => existing.id === record.id)) {
     return {
       version: PRACTICE_PROGRESS_VERSION,
-      records: progress.records.map((entry) => ({ ...entry })),
+      records: progress.records.map((entry) => ({ ...(entry.id === record.id ? record : entry) })),
     }
   }
   return {

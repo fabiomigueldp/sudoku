@@ -7,6 +7,7 @@ import type {
   InputMode,
 } from '../domain/types'
 import { candidatesFor, conflictingCells, peersFor } from '../engine'
+import { planAutoFinish } from '../game/autoFinish'
 import { Board } from './Board'
 import { GameHeader } from './GameHeader'
 import {
@@ -38,6 +39,7 @@ interface GameProps {
   onUndo: () => void
   onRedo: () => void
   onHint: () => void
+  onAutoFinish: () => void
   onHintNext: () => void
   onHintClose: () => void
   onCheck: () => void
@@ -74,6 +76,7 @@ export function Game({
   onUndo,
   onRedo,
   onHint,
+  onAutoFinish,
   onHintNext,
   onHintClose,
   onCheck,
@@ -88,6 +91,10 @@ export function Game({
   onAnalyze,
 }: GameProps) {
   const values = useMemo(() => boardValues(game.cells), [game.cells])
+  const autoFinish = useMemo(
+    () => planAutoFinish({ cells: game.cells, puzzle: game.puzzle, status: game.status }),
+    [game.cells, game.puzzle, game.status],
+  )
   const peers = useMemo(
     () =>
       new Set(
@@ -294,6 +301,23 @@ export function Game({
             onRedo={onRedo}
             onHint={onHint}
           />
+          <div className="auto-finish-slot">
+            {autoFinish && !game.hint && (
+              <div className="auto-finish">
+                <p id="auto-finish-description">
+                  Restam apenas candidatos únicos. Conta como uma dica e pode ser desfeito.
+                </p>
+                <button
+                  type="button"
+                  className="secondary-action"
+                  aria-describedby="auto-finish-description"
+                  onClick={onAutoFinish}
+                >
+                  {autoFinish.length === 1 ? 'Concluir a última casa' : `Concluir as ${autoFinish.length} casas restantes`}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -324,6 +348,7 @@ export function Game({
           onHome={onHome}
           onAgain={onNew}
           onAnalyze={onAnalyze}
+          onUndo={game.history.length > 0 ? onUndo : undefined}
         />
       )}
     </main>

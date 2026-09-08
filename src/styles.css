@@ -431,7 +431,7 @@
     display: grid;
     height: 100vh;
     height: 100dvh;
-    overflow: clip;
+    overflow: auto;
     grid-template-rows: auto minmax(0, 1fr);
     padding:
       var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
@@ -473,6 +473,32 @@
 }
 
 @layer components {
+  .auto-finish-slot {
+    position: relative;
+  }
+
+  .auto-finish {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    left: 0;
+    margin-top: 12px;
+    padding-bottom: var(--safe-bottom);
+  }
+
+  .auto-finish > button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .auto-finish > p {
+    margin: 0 0 6px;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    line-height: 1.45;
+    text-align: center;
+  }
+
   .wordmark {
     display: inline-flex;
     margin: 0;

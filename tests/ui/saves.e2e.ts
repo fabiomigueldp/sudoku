@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
-import { DEFAULT_SETTINGS } from '../../src/domain/catalog'
+import { DEFAULT_SETTINGS, EMPTY_STATS } from '../../src/domain/catalog'
+import { createGameRecord } from '../../src/game/stats'
 import { createGameState } from '../../src/game/state'
 import { gameActions, reduceGame } from '../../src/game/reducer'
 import { dailySeed } from '../../src/engine/daily'
@@ -227,4 +228,24 @@ test('a completed recovery checkpoint is archived before continuing another save
   await page.getByRole('button', { name: 'Voltar', exact: true }).click()
   await page.getByRole('button', { name: /^Continuar / }).click()
   await expect(page.getByRole('gridcell').nth(0)).toHaveAttribute('aria-label', /vazia/)
+})
+
+test('recovering a previously recorded legacy completion does not count it twice', async ({ page }) => {
+  const givens = [...SOLUTION]
+  givens[0] = 0
+  const now = Date.now()
+  const finished = reduceGame(
+    createGameState(puzzleWithGivens(givens), { now: now - 1000 }),
+    gameActions.setDigit(SOLUTION[0] as 1, now),
+  )
+  const stats = { ...EMPTY_STATS, completed: 1, cleanSolves: 1, totalTimeMs: 1000, records: [createGameRecord(finished)] }
+  await page.addInitScript(({ finished, stats, now }) => {
+    localStorage.setItem('absolute-sudoku:checkpoint:v1', JSON.stringify({
+      id: 'old-attempt', schemaVersion: 4, savedAt: now, state: finished, eventLog: null,
+    }))
+    localStorage.setItem('absolute-sudoku:stats:v2', JSON.stringify(stats))
+  }, { finished, stats, now })
+  await page.goto('/')
+  await page.getByRole('button', { name: 'Estatísticas', exact: true }).click()
+  await expect(page.locator('.stats-summary > div').first()).toContainText('1')
 })

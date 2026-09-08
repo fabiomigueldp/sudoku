@@ -76,6 +76,7 @@ function eventTitle(event: GameEvent | null, state: GameState): string {
   if (action.type === 'history/redo') return 'Refazer'
   if (action.type === 'hint/show') return 'Dica solicitada'
   if (action.type === 'hint/apply') return 'Dica aplicada'
+  if (action.type === 'game/auto-finish') return 'Conclusão automática'
   if (action.type === 'game/restart') return 'Grade reiniciada'
   return 'Movimento'
 }

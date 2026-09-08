@@ -510,8 +510,13 @@ export function App() {
       // A close immediately after the final digit can leave only the completed
       // checkpoint. Archive it before choosing another unfinished game.
       if (session?.state.status === 'completed') {
+        const legacyRecordId = `${session.state.puzzle.id}:${session.state.completedAt}`
+        const existingRecord = [...storedStats.records, ...storedPractice.records].find(
+          (record) => record.id === session.id || record.id === legacyRecordId,
+        )
         const recovered = await saveGameCompletion(session.state, {
           sessionId: session.id,
+          recordId: existingRecord?.id ?? session.id,
           eventLog: session.eventLog,
           replaySettings: replaySettingsFromGameSettings(storedSettings),
         })
@@ -604,6 +609,9 @@ export function App() {
 
     void saveGameCompletion(game, {
       ...(sessionIdRef.current ? { sessionId: sessionIdRef.current } : {}),
+      recordId: [...stats.records, ...practiceProgress.records].find(
+        (record) => record.id === sessionIdRef.current || record.id === completionKey,
+      )?.id ?? sessionIdRef.current ?? completionKey,
       eventLog: eventLogRef.current,
       replaySettings: replaySettingsFromGameSettings(settingsRef.current),
     }).then(async (result) => {
@@ -615,7 +623,7 @@ export function App() {
       setArchives(storedArchives)
       setPracticeProgress(storedPractice)
     })
-  }, [game])
+  }, [game, stats.records, practiceProgress.records])
 
   useEffect(() => {
     if (screen !== 'game' || game?.status !== 'playing') return
@@ -1165,6 +1173,7 @@ export function App() {
           onUndo={() => dispatch(gameActions.undo(Date.now()))}
           onRedo={() => dispatch(gameActions.redo(Date.now()))}
           onHint={showOrAdvanceHint}
+          onAutoFinish={() => dispatch({ type: 'game/auto-finish', at: Date.now() })}
           onHintNext={advanceHint}
           onHintClose={() => dispatch(gameActions.dismissHint(Date.now()))}
           onCheck={() => {
