@@ -166,7 +166,9 @@ test('saved games remain readable at 320px with dark theme and high contrast', a
   await page.locator('.saved-delete').click()
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
   for (const button of await page.locator('.saved-toolbar button, .saved-delete, .saved-confirmation button').all()) {
-    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    // Firefox can report 44 CSS pixels as 43.99998474121094 on Linux.
+    // Tolerate measurement precision without accepting a smaller touch target.
+    expect((await button.boundingBox())!.height + 0.001).toBeGreaterThanOrEqual(44)
   }
   await page.screenshot({ path: testInfo.outputPath('saved-mobile-dark.png'), fullPage: true })
 })
